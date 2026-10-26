@@ -4,7 +4,7 @@
     {
       "id": "TASK-001",
       "objective": "Run Codex through an adapter and an agent-neutral session runner that captures stdout and a 20-line stderr tail silently, with no temporary files.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": ["US-003", "US-004", "US-005"],
       "acceptance_criteria_addressed": ["AC-010", "AC-013", "AC-014", "AC-015", "AC-016", "AC-019", "AC-020", "AC-021"],
       "completion_criteria": [

@@ -23,13 +23,13 @@ const calls = process.env.AFK_CALLS;
 const count = Number(fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '0') + 1;
 fs.writeFileSync(calls, String(count));
 fs.writeFileSync(process.env.AFK_ARGS, JSON.stringify({ args, cwd: process.cwd(), prompt: fs.readFileSync(0, 'utf8') }));
-process.stdout.write('live activity\\n');
+process.stderr.write('agent diagnostic\\n');
 const outcomes = JSON.parse(process.env.AFK_OUTCOMES || '["complete"]');
 const outcome = outcomes[Math.min(count - 1, outcomes.length - 1)];
 if (outcome === 'exit') process.exit(7);
 if (outcome === 'timeout') setInterval(() => {}, 1000);
 else {
-  if (outcome !== 'missing') fs.writeFileSync(args[args.indexOf('--output-last-message') + 1], outcome === 'invalid' ? 'not JSON' : JSON.stringify(outcome === 'blocked' ? { outcome, blocker_text: 'needs credentials' } : outcome === 'fail' ? { outcome, failure_summary: 'test failed' } : { outcome }));
+  if (outcome !== 'missing') process.stdout.write(outcome === 'invalid' ? 'not JSON' : JSON.stringify(outcome === 'blocked' ? { outcome, blocker_text: 'needs credentials' } : outcome === 'fail' ? { outcome, failure_summary: 'test failed' } : { outcome }));
 }
 `, { mode: 0o755 });
   const env = { ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}`, AFK_CALLS: invocations, AFK_ARGS: join(root, 'args') };
@@ -99,7 +99,9 @@ test('all final outcomes report a clear status and consistent exit code', () => 
     const result = launch([...args, 'prompt'], { env: { AFK_OUTCOMES: JSON.stringify([outcome]) } });
     assert.equal(result.status, code, `${outcome}: ${result.stderr}`);
     assert.match(result.stdout + result.stderr, message, outcome);
-    if (outcome !== 'timeout') assert.match(result.stdout, /live activity/, outcome);
+    assert.doesNotMatch(result.stdout, /agent diagnostic/, outcome);
+    assert.doesNotMatch(result.stdout, /\{"outcome":/, outcome);
+    assert.doesNotMatch(result.stderr, /agent diagnostic/, outcome);
     assert.match(result.stderr, /starting iteration 1/, outcome);
     if (outcome === 'fail') assert.match(result.stderr, /task failed: test failed/);
     if (['exit', 'missing', 'invalid'].includes(outcome)) assert.match(result.stderr, /retrying with fresh session 2/);
@@ -134,16 +136,14 @@ test('a run leaves the Git workspace and home unchanged', () => fixture(({ works
   assert.equal(readFileSync(join(workspace, 'existing.txt'), 'utf8'), 'existing work');
 }));
 
-test('activity appears before Codex exits', { timeout: 10000 }, async () => {
+test('agent output stays hidden while Codex runs', { timeout: 10000 }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'afk-live-'));
   const bin = join(root, 'bin');
   mkdirSync(bin);
   writeFileSync(join(bin, 'codex'), `#!/usr/bin/env node
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-process.stdout.write('working now\\n');
+process.stderr.write('working now\\n');
 setTimeout(() => {
-  fs.writeFileSync(args[args.indexOf('--output-last-message') + 1], '{"outcome":"complete"}');
+  process.stdout.write('{"outcome":"complete"}');
   process.exit(0);
 }, 500);
 `, { mode: 0o755 });
@@ -153,14 +153,17 @@ setTimeout(() => {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let sawActivityBeforeExit = false;
+    let stderr = '';
     child.stdout.on('data', chunk => {
       if (chunk.toString().includes('working now') && child.exitCode === null) sawActivityBeforeExit = true;
     });
+    child.stderr.on('data', chunk => { stderr += chunk.toString(); });
     const status = await new Promise((resolve, reject) => {
       child.once('error', reject);
       child.once('close', resolve);
     });
     assert.equal(status, 0);
-    assert.equal(sawActivityBeforeExit, true);
+    assert.equal(sawActivityBeforeExit, false);
+    assert.doesNotMatch(stderr, /working now/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -42,8 +42,7 @@ const countPath = process.env.AFK_COUNT;
 const count = Number(fs.existsSync(countPath) ? fs.readFileSync(countPath, 'utf8') : '0') + 1;
 fs.writeFileSync(countPath, String(count));
 if (process.env.AFK_FINISH === 'yes') {
-  const args = process.argv.slice(2);
-  fs.writeFileSync(args[args.indexOf('--output-last-message') + 1], count === 2 ? '{"outcome":"repeat"}' : '{"outcome":"complete"}');
+  process.stdout.write(count === 2 ? '{"outcome":"repeat"}' : '{"outcome":"complete"}');
   process.exit(0);
 }
 process.on('SIGINT', () => {

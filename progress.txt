@@ -1,0 +1,44 @@
+## Project discovery
+- `npm test` builds TypeScript and runs the full Node test suite; fake agent executables are placed on PATH by session and CLI tests.
+- The existing CLI flag is `--reasoning-effort`; Codex receives it through `-c model_reasoning_effort=<JSON string>`.
+---
+
+## 2026-10-26 14:47:28 UTC
+- Task id: TASK-001
+- What was implemented:
+  - Added the `AgentAdapter` and `FinalMessageResult` contract and a stateless Codex adapter.
+  - Refactored the shared session runner to launch the adapter executable, capture final stdout and a 20-line stderr tail, and classify missing or invalid extraction without response files.
+  - Kept Codex as the default adapter for existing invocations pending TASK-002 registry and option work.
+  - Updated fake Codex fixtures to emit their protocol response on stdout and keep agent output hidden.
+- Files changed:
+  - src/agents/types.ts
+  - src/agents/codex.ts
+  - src/session.ts
+  - src/run.ts
+  - test/agents-codex.test.mjs
+  - test/session.test.mjs
+  - test/main.test.mjs
+  - test/interrupt.test.mjs
+  - specs/agent-adapters.plan.json
+  - progress.txt
+- Verification:
+  - RED: `node --test test/agents-codex.test.mjs` failed because the adapter did not exist.
+  - RED: `node --test test/session.test.mjs` failed when a UTF-8 stderr character crossed chunks; GREEN after streaming decoder change.
+  - `npm test` passed: 36 tests, 0 failures, including CLI and package tests.
+  - AC-010: CLI fixture tests show neither the agent diagnostic stderr nor protocol JSON stdout appears in harness output; the long-running fixture shows no agent activity in output.
+  - AC-013: adapter unit tests verify Codex arguments omit `--output-last-message`, extract non-empty stdout, and report empty/whitespace stdout as missing; session tests verify exit mapping.
+  - AC-014: session tests verify no response file is created; source inspection confirms the runner has no filesystem writes and the adapter has no filesystem operations.
+  - AC-015: source inspection confirms no progress/heartbeat timer; long-running CLI test passes without agent activity output.
+  - AC-016: session test verifies the last 20 stderr lines in order, empty tail when no stderr, and correct decoding of split UTF-8 characters.
+  - AC-019: adapter unit tests verify `name`, `executable`, pure arguments, and extraction; `src/agents/types.ts` defines the specified shape.
+  - AC-020: session tests verify workspace, stdin prompt, stdout/stderr capture, timeout, abort, launch error and process exit handling in the runner.
+  - AC-021: the adapter contract permits ignoring optional settings; the runner imposes no setting validation or warning. Codex honors model and effort as verified by unit and session tests.
+  - Read-only review found split UTF-8 decoding and CLI stdout test gaps; both were resolved and full suite rerun.
+- Learnings for future iterations:
+  - The runner currently defaults to Codex in `SessionConfig`; TASK-002 should wire selected adapters from its registry through run options.
+  - `stderrTail` is available on non-timeout, non-abort session results; TASK-003 must carry it through run reporting.
+- Scope deviations:
+  - `src/run.ts` needed two result-kind mappings because missing and invalid extraction now come from the session runner.
+  - Existing CLI and interruption fixtures were updated to emit the final message on stdout, matching the new Codex contract.
+- Follow up needed: TASK-002 registry and agent selection remain pending.
+---

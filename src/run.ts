@@ -46,6 +46,8 @@ export async function runLoop(options: RunOptions, runSession: SessionRunner, re
     let error: ExecutionError;
     if (result.kind === 'launch-failed') error = { kind: 'launch-failed', message: result.message };
     else if (result.kind === 'exit-failed') error = { kind: 'exit-failed', status: result.status };
+    else if (result.kind === 'missing-response') error = { kind: 'missing-response' };
+    else if (result.kind === 'invalid-response') error = { kind: 'invalid-response' };
     else {
       const response = parseResponse(result.finalMessage);
       if ('kind' in response) {

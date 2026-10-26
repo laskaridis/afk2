@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync, realpathSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { runSession } from '../dist/session.js';
+import { codex } from '../dist/agents/codex.js';
 
 async function withFake(source, check) {
   const dir = mkdtempSync(join(tmpdir(), 'afk-session-'));
   const oldPath = process.env.PATH;
   const oldRecord = process.env.AFK_FAKE_RECORD;
-  const fake = join(dir, 'codex');
-  writeFileSync(fake, `#!/usr/bin/env node\n${source}\n`, { mode: 0o755 });
+  writeFileSync(join(dir, 'codex'), `#!/usr/bin/env node\n${source}\n`, { mode: 0o755 });
   process.env.PATH = `${dir}:${oldPath ?? ''}`;
   process.env.AFK_FAKE_RECORD = join(dir, 'record.json');
   try { await check(dir); }
@@ -21,7 +21,7 @@ async function withFake(source, check) {
   }
 }
 
-const config = (cwd, extras = {}) => ({ prompt: 'Original task prompt', cwd, ...extras });
+const config = (cwd, extras = {}) => ({ adapter: codex, prompt: 'Original task prompt', cwd, ...extras });
 const recordAndRespond = `
 const fs = require('node:fs');
 const args = process.argv.slice(2);
@@ -29,100 +29,100 @@ const chunks = [];
 process.stdin.on('data', chunk => chunks.push(chunk));
 process.stdin.on('end', () => {
   fs.writeFileSync(process.env.AFK_FAKE_RECORD, JSON.stringify({ args, cwd: process.cwd(), prompt: Buffer.concat(chunks).toString() }));
-  const path = args[args.indexOf('--output-last-message') + 1];
-  fs.writeFileSync(path, '{"outcome":"complete"}');
-  process.stdout.write('live stdout\\n');
-  process.stderr.write('live stderr\\n');
+  process.stdout.write('{"outcome":"complete"}\\n');
+  process.stderr.write('diagnostic\\n');
 });`;
 
-test('launches fresh Codex in the workspace with skill instructions and only supplied overrides', async () => {
+test('launches Codex in the workspace with the prompt and only supplied overrides', async () => {
   await withFake(recordAndRespond, async (dir) => {
-    const activity = [];
-    const result = await runSession(config(dir), new AbortController().signal, (stream, chunk) => activity.push([stream, chunk.toString()]));
-    assert.deepEqual(result, { kind: 'ok', finalMessage: '{"outcome":"complete"}' });
+    const result = await runSession(config(dir), new AbortController().signal);
+    assert.deepEqual(result, { kind: 'ok', finalMessage: '{"outcome":"complete"}\n', stderrTail: ['diagnostic'] });
     const { args, cwd, prompt } = JSON.parse(readFileSync(join(dir, 'record.json'), 'utf8'));
     assert.equal(cwd, realpathSync(dir));
-    assert.deepEqual(args.slice(0, 2), ['exec', '--approve-for-me']);
-    assert.equal(args.at(-1), '-');
-    assert.ok(args.includes('--output-last-message'));
-    assert.ok(!args.some(arg => ['resume', 'fork', '--model', '-c', '--config', '--worktree'].includes(arg)));
+    assert.deepEqual(args, ['exec', '--approve-for-me', '-']);
     assert.match(prompt, /Use the available code skill for this iteration/);
-    assert.match(prompt, /one task|single task/i);
-    assert.match(prompt, /response protocol/i);
     assert.ok(prompt.endsWith('Original task prompt'));
-    assert.deepEqual(activity, [['stdout', 'live stdout\n'], ['stderr', 'live stderr\n']]);
-    assert.equal(existsSync(args[args.indexOf('--output-last-message') + 1]), false);
+    assert.deepEqual(readdirSync(dir).sort(), ['codex', 'record.json']);
   });
   await withFake(recordAndRespond, async (dir) => {
-    await runSession(config(dir, { model: 'chosen', reasoningEffort: 'high' }), new AbortController().signal, () => {});
+    await runSession(config(dir, { model: 'chosen', reasoningEffort: 'high' }), new AbortController().signal);
     const { args } = JSON.parse(readFileSync(join(dir, 'record.json'), 'utf8'));
-    assert.deepEqual(args.slice(args.indexOf('--model'), args.indexOf('--model') + 2), ['--model', 'chosen']);
-    assert.deepEqual(args.slice(args.indexOf('-c'), args.indexOf('-c') + 2), ['-c', 'model_reasoning_effort="high"']);
+    assert.deepEqual(args, ['exec', '--approve-for-me', '--model', 'chosen', '-c', 'model_reasoning_effort="high"', '-']);
   });
 });
 
-test('forwards output before exit and takes the final message only from the dedicated file', async () => {
+test('captures output silently until exit and uses stdout as final message', async () => {
   await withFake(`
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-process.stdout.write('{"outcome":"repeat"}\\n');
+process.stdout.write('{"outcome":"complete"}\\n');
 process.stderr.write('working\\n');
-setTimeout(() => { fs.writeFileSync(args[args.indexOf('--output-last-message') + 1], '{"outcome":"complete"}'); process.exit(0); }, 150);
+setTimeout(() => process.exit(0), 150);
 `, async (dir) => {
-    let settled = false;
-    let live = false;
-    const pending = runSession(config(dir), new AbortController().signal, (stream, chunk) => {
-      if (stream === 'stdout' && chunk.toString().includes('repeat')) live = !settled;
-    }).then(value => { settled = true; return value; });
-    const result = await pending;
-    assert.equal(live, true);
-    assert.deepEqual(result, { kind: 'ok', finalMessage: '{"outcome":"complete"}' });
+    const result = await runSession(config(dir), new AbortController().signal);
+    assert.deepEqual(result, { kind: 'ok', finalMessage: '{"outcome":"complete"}\n', stderrTail: ['working'] });
   });
 });
 
-test('reports missing final message and unsuccessful exit separately', async () => {
-  await withFake(`process.stdin.resume(); process.stdin.on('end', () => process.exit(0));`, async (dir) => {
-    assert.deepEqual(await runSession(config(dir), new AbortController().signal, () => {}), { kind: 'ok', finalMessage: '' });
-  });
+test('keeps only the final 20 stderr lines in original order', async () => {
   await withFake(`
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-const path = args[args.indexOf('--output-last-message') + 1];
-fs.writeFileSync(process.env.AFK_FAKE_RECORD, path);
-fs.writeFileSync(path, '{"outcome":"complete"}');
-process.exit(7);
+process.stderr.write(Array.from({ length: 25 }, (_, i) => 'line ' + i).join('\\n') + '\\n');
+process.stdout.write('{"outcome":"complete"}');
 `, async (dir) => {
-    assert.deepEqual(await runSession(config(dir), new AbortController().signal, () => {}), { kind: 'exit-failed', status: 7 });
-    assert.equal(existsSync(readFileSync(join(dir, 'record.json'), 'utf8')), false);
+    const result = await runSession(config(dir), new AbortController().signal);
+    assert.deepEqual(result.stderrTail, Array.from({ length: 20 }, (_, i) => `line ${i + 5}`));
   });
 });
 
-test('reports a launch failure without leaving a temporary response file', async () => {
+test('preserves a UTF-8 character split across stderr chunks', async () => {
+  await withFake(`
+const bytes = Buffer.from('before € after\\n');
+process.stderr.write(bytes.subarray(0, 8));
+setTimeout(() => {
+  process.stderr.write(bytes.subarray(8));
+  process.stdout.write('{"outcome":"complete"}');
+}, 30);
+`, async (dir) => {
+    const result = await runSession(config(dir), new AbortController().signal);
+    assert.deepEqual(result.stderrTail, ['before € after']);
+  });
+});
+
+test('reports empty or whitespace stdout as missing and unsuccessful exit separately', async () => {
+  for (const output of ['', ' \n\t']) {
+    await withFake(`process.stdout.write(${JSON.stringify(output)});`, async (dir) => {
+      assert.deepEqual(await runSession(config(dir), new AbortController().signal), { kind: 'missing-response', stderrTail: [] });
+    });
+  }
+  await withFake(`process.stdout.write('{"outcome":"complete"}'); process.exit(7);`, async (dir) => {
+    assert.deepEqual(await runSession(config(dir), new AbortController().signal), { kind: 'exit-failed', status: 7, stderrTail: [] });
+  });
+});
+
+test('reports a launch failure without creating a temporary response file', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'afk-missing-'));
   const oldPath = process.env.PATH;
   process.env.PATH = dir;
   try {
-    const result = await runSession(config(dir), new AbortController().signal, () => {});
+    const result = await runSession(config(dir), new AbortController().signal);
     assert.equal(result.kind, 'launch-failed');
-    assert.deepEqual((await import('node:fs')).readdirSync(dir), []);
+    assert.deepEqual(result.stderrTail, []);
+    assert.deepEqual(readdirSync(dir), []);
   } finally { process.env.PATH = oldPath; rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('times out and terminates a hung session, while no timeout permits completion', async () => {
   await withFake(`
 const fs = require('node:fs');
-const args = process.argv.slice(2);
 fs.writeFileSync(process.env.AFK_FAKE_RECORD, String(process.pid));
 process.on('SIGINT', () => { fs.writeFileSync(process.env.AFK_FAKE_RECORD + '.signal', 'SIGINT'); process.exit(0); });
-setTimeout(() => { fs.writeFileSync(args[args.indexOf('--output-last-message') + 1], '{"outcome":"complete"}'); process.exit(0); }, 1500);
+setTimeout(() => { process.stdout.write('{"outcome":"complete"}'); process.exit(0); }, 1500);
 `, async (dir) => {
-    const timed = await runSession(config(dir, { sessionTimeout: 0.8 }), new AbortController().signal, () => {});
+    const timed = await runSession(config(dir, { sessionTimeout: 0.8 }), new AbortController().signal);
     assert.deepEqual(timed, { kind: 'timed-out' });
     assert.equal(readFileSync(join(dir, 'record.json.signal'), 'utf8'), 'SIGINT');
     const pid = Number(readFileSync(join(dir, 'record.json'), 'utf8'));
     assert.throws(() => process.kill(pid, 0), /ESRCH/);
-    const normal = await runSession(config(dir), new AbortController().signal, () => {});
-    assert.deepEqual(normal, { kind: 'ok', finalMessage: '{"outcome":"complete"}' });
+    const normal = await runSession(config(dir), new AbortController().signal);
+    assert.deepEqual(normal, { kind: 'ok', finalMessage: '{"outcome":"complete"}', stderrTail: [] });
   });
 });
 
@@ -134,7 +134,7 @@ process.on('SIGINT', () => { fs.writeFileSync(process.env.AFK_FAKE_RECORD + '.si
 setInterval(() => {}, 1000);
 `, async (dir) => {
     const controller = new AbortController();
-    const pending = runSession(config(dir), controller.signal, () => {});
+    const pending = runSession(config(dir), controller.signal);
     while (!existsSync(join(dir, 'record.json'))) await new Promise(resolve => setTimeout(resolve, 10));
     controller.abort();
     assert.deepEqual(await pending, { kind: 'aborted' });
@@ -147,7 +147,7 @@ test('an already aborted signal starts no session', async () => {
   await withFake(recordAndRespond, async (dir) => {
     const controller = new AbortController();
     controller.abort();
-    assert.deepEqual(await runSession(config(dir), controller.signal, () => {}), { kind: 'aborted' });
+    assert.deepEqual(await runSession(config(dir), controller.signal), { kind: 'aborted' });
     assert.equal(existsSync(join(dir, 'record.json')), false);
   });
 });
