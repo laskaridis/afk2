@@ -1,0 +1,134 @@
+{
+  "spec_path": "specs/agent-adapters.spec.md",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "objective": "Run Codex through an adapter and an agent-neutral session runner that captures stdout and a 20-line stderr tail silently, with no temporary files.",
+      "status": "pending",
+      "stories_enabled": ["US-003", "US-004", "US-005"],
+      "acceptance_criteria_addressed": ["AC-010", "AC-013", "AC-014", "AC-015", "AC-016", "AC-019", "AC-020", "AC-021"],
+      "completion_criteria": [
+        "A Codex adapter module under src/agents/ exports the AgentAdapter shape from the spec with pure buildArgs and extractFinalMessage; unit tests cover its argument list (with and without model/effort) and its message extraction (non-empty, empty, whitespace-only stdout).",
+        "The session runner takes an adapter and launches its executable in the workspace with the prompt on stdin; with the Codex fake fixture writing its final message to stdout, the session yields that message.",
+        "The Codex invocation no longer contains --output-last-message and no temp file or directory is created or left behind during a session.",
+        "Nothing the agent writes to stdout or stderr reaches the afk process's own stdout or stderr during a session.",
+        "A session result exposes at most the last 20 stderr lines in original order, and none when stderr was empty.",
+        "Exit code 0 with empty or whitespace-only stdout is a missing response; non-zero exit and launch failure map to the existing execution errors; timeout and abort behavior is unchanged.",
+        "afk prints no periodic progress or heartbeat lines while a session is running."
+      ],
+      "constraints": [
+        "The adapter has no per-session state, temp files, or cleanup; the session runner owns spawning, stdin, capture, timeout, Ctrl+C and exit mapping.",
+        "Existing session tests are updated to the new Codex contract (final message on stdout)."
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "TASK-002",
+      "objective": "Provide a registry of built-in adapters and an --agent option that selects the agent for every session of a run, defaulting to Codex.",
+      "status": "pending",
+      "stories_enabled": ["US-001", "US-005"],
+      "acceptance_criteria_addressed": ["AC-001", "AC-002", "AC-003", "AC-005", "AC-022"],
+      "completion_criteria": [
+        "A single registry maps agent names to adapters and exposes the default name and the list of supported names.",
+        "Without --agent, every session of a run uses the codex adapter; with --agent codex every session including retries uses that adapter.",
+        "--agent with an unsupported or empty value yields an option error whose message lists the supported names from the registry, exits 2, and launches no session.",
+        "Registering an additional adapter in the registry alone (verified in a test with a stub adapter) makes it accepted by --agent and listed in the error, with no other source change.",
+        "--model and --reasoning-effort values are passed to the adapter unchanged, with no agent-specific validation beyond the existing non-empty check; when neither is given no override is supplied."
+      ],
+      "constraints": [
+        "Option errors exit 2 (decided with the user); the session-timeout exit code stays 2; input errors (prompt source problems) keep exit 1.",
+        "The CLI flag remains --reasoning-effort; only internal naming may become effort."
+      ],
+      "dependencies": ["TASK-001"]
+    },
+    {
+      "id": "TASK-003",
+      "objective": "Report every run with agent-neutral `[afk]` status lines, including the agent's stderr tail after execution errors.",
+      "status": "pending",
+      "stories_enabled": ["US-003", "US-004"],
+      "acceptance_criteria_addressed": ["AC-011", "AC-012", "AC-017", "AC-018"],
+      "completion_criteria": [
+        "Iteration start prints `[afk] Iteration <n>/<max>: starting agent session` to stderr.",
+        "Retry, task-failure, execution-error and final status lines carry the `[afk] ` prefix, name no specific agent, and use the wording e.g. `failed to launch agent`, `agent exited unsuccessfully with exit code 3`, `agent exited without a final response`, `agent final response is invalid: <reason>`, `agent session timed out after <n> seconds`; blocked and execution-error finals read `[afk] Run blocked: <text>` and `[afk] Execution error: <detail>`; completion, iteration-limit and interruption finals keep their existing information.",
+        "Exit codes are unchanged for completion (0), blocker, execution error and iteration limit (1), timeout (2), and interruption (130/143/129).",
+        "After an `[afk] Execution error: …` line (including one that leads to a retry), up to the last 20 stderr lines of that session are printed to stderr in original order; nothing extra is printed when stderr was empty.",
+        "No agent stderr is printed after a valid protocol response, a timeout, or an interruption.",
+        "A test shows that identical sequences of session results produce identical stderr lines, final status and exit code regardless of which adapter produced them."
+      ],
+      "constraints": [
+        "The session prompt, protocol parsing and loop policy are unchanged."
+      ],
+      "dependencies": ["TASK-001", "TASK-002"]
+    },
+    {
+      "id": "TASK-004",
+      "objective": "Support `--agent claude` by running Claude Code in print mode with JSON output and classifying its results per the spec.",
+      "status": "pending",
+      "stories_enabled": ["US-002"],
+      "acceptance_criteria_addressed": ["AC-006", "AC-007", "AC-008", "AC-009", "AC-021"],
+      "completion_criteria": [
+        "A Claude adapter registered in the registry launches `claude` non-interactively in print mode with JSON output and the auto permission mode, in the workspace, with the prompt on stdin; it adds --model and --effort only when the corresponding afk option is given; it never uses bypassPermissions or any full-access mode.",
+        "Exit 0 with a JSON `result` that is a non-empty string is evaluated by the existing protocol parser and acted on exactly as for Codex (repeat, complete, blocked, fail).",
+        "Each row of the AC-008 table is covered by a unit test of the adapter and a session-level test with a Claude fake fixture: launch failure; non-zero exit without structured is_error; signal termination; exit 0 with non-JSON stdout (invalid response, parse-failure reason); is_error true on exit 0 or non-zero exit (exited unsuccessfully, reported reason includes the `subtype`); exit 0 with empty stdout or no non-empty `result` string (missing response); protocol violation (invalid response with existing protocol reasons).",
+        "The retry-once policy applies to every Claude execution error, and timeout and Ctrl+C end the run with the same messages, no retry, and the same exit codes as for Codex."
+      ],
+      "constraints": [
+        "Claude-specific behavior lives only in the adapter module; the run loop and protocol parser stay agent-neutral.",
+        "Tests must not require a real Claude installation."
+      ],
+      "dependencies": ["TASK-001", "TASK-002", "TASK-003"]
+    },
+    {
+      "id": "TASK-005",
+      "objective": "Run one shared harness behavior test suite against every registered adapter using a per-agent fake executable fixture.",
+      "status": "pending",
+      "stories_enabled": ["US-005"],
+      "acceptance_criteria_addressed": ["AC-023", "AC-012"],
+      "completion_criteria": [
+        "A shared set of tests covering protocol outcomes, retry policy, iteration limit, timeout, interruption, stderr tail and output wording runs once per registered adapter, iterating the registry.",
+        "Each agent has a fake executable fixture that emits its final message the way the real agent does: Codex writes it to stdout (no --output-last-message), Claude writes the JSON result object to stdout.",
+        "Adding a fixture for a new registered agent is the only change needed to extend the suite; the suite fails if a registered adapter has no fixture.",
+        "`npm test` passes with no real agent installed."
+      ],
+      "constraints": [
+        "Per-adapter buildArgs and extractFinalMessage unit tests remain next to each adapter task's tests."
+      ],
+      "dependencies": ["TASK-003", "TASK-004"]
+    },
+    {
+      "id": "TASK-006",
+      "objective": "Make help, README and package metadata describe afk as agent-neutral and document each supported agent.",
+      "status": "pending",
+      "stories_enabled": ["US-006", "US-001"],
+      "acceptance_criteria_addressed": ["AC-004", "AC-024", "AC-025", "AC-026"],
+      "completion_criteria": [
+        "--help and -h document `--agent <name>`, list the supported names from the registry, and state the default `codex`; help text refers to \"the coding agent\" instead of Codex and states that --model and --reasoning-effort values are passed to the agent unchanged.",
+        "Help still takes precedence over every other option including an invalid --agent value, exits 0 and starts no session (tested).",
+        "README describes afk as agent-neutral, documents --agent, and has a \"Supported agents\" section giving per agent its prerequisites and how afk launches it: Codex (CLI installed and authenticated with --approve-for-me support); Claude Code (CLI installed and authenticated, auto permission mode available for account and model, `code` skill discoverable e.g. under .claude/skills), plus which harness settings each agent honors.",
+        "package.json description no longer names Codex as the only agent, verified by the package test."
+      ],
+      "constraints": [
+        "No version bump, changelog or publishing."
+      ],
+      "dependencies": ["TASK-002", "TASK-004"]
+    },
+    {
+      "id": "TASK-007",
+      "objective": "Record manual smoke-check evidence that both adapters work against the real Codex and Claude Code CLIs.",
+      "status": "pending",
+      "stories_enabled": ["US-007"],
+      "acceptance_criteria_addressed": ["AC-027"],
+      "completion_criteria": [
+        "Evidence records the installed codex and claude CLI versions.",
+        "Evidence shows `codex exec --approve-for-me -o <file> -` with piped stdout and a trivial prompt writes the same final message to stdout as to <file>, apart from surrounding whitespace.",
+        "Evidence shows `afk --agent codex` and `afk --agent claude`, each run once in a scratch workspace with a prompt naming no specification or task list, ending with `[afk] Run blocked: …` and exit code 1.",
+        "Any mismatch with the spec's assumptions (including Claude JSON fields result, is_error, subtype) is listed as a follow-up fix task rather than fixed in this task."
+      ],
+      "constraints": [
+        "Manual check, not part of the automated suite; changes no source files.",
+        "Requires authenticated Codex and Claude Code installations; if either is unavailable, report that and mark the task not completed."
+      ],
+      "dependencies": ["TASK-005", "TASK-006"]
+    }
+  ]
+}
