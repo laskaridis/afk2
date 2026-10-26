@@ -20,10 +20,12 @@ export type SessionResult =
   | { kind: 'timed-out' }
   | { kind: 'aborted' };
 
+export type AgentOutput = (stream: 'stdout' | 'stderr', chunk: Buffer) => void;
+
 const skillInstructions = 'Use the available code skill for this iteration. Implement one task and follow its response protocol.\n---\n';
 
 /** Run one new agent conversation, leaving all run policy to the caller. */
-export async function runSession(config: SessionConfig, signal: AbortSignal): Promise<SessionResult> {
+export async function runSession(config: SessionConfig, signal: AbortSignal, onOutput?: AgentOutput): Promise<SessionResult> {
   if (signal.aborted) return { kind: 'aborted' };
   const adapter = config.adapter;
   const args = adapter.buildArgs({ cwd: config.cwd, model: config.model, effort: config.reasoningEffort });
@@ -64,8 +66,12 @@ export async function runSession(config: SessionConfig, signal: AbortSignal): Pr
       timeout = setTimeout(() => stop('timeout'), config.sessionTimeout * 1000);
     }
 
-    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout.push(chunk);
+      onOutput?.('stdout', chunk);
+    });
     child.stderr.on('data', (chunk: Buffer) => {
+      onOutput?.('stderr', chunk);
       const lines = (stderrRemainder + stderrDecoder.write(chunk)).split('\n');
       stderrRemainder = lines.pop() ?? '';
       for (const line of lines) {

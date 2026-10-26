@@ -1,6 +1,6 @@
 import type { RunOptions } from './cli.js';
 import { parseResponse } from './protocol.js';
-import type { SessionConfig, SessionResult } from './session.js';
+import type { AgentOutput, SessionConfig, SessionResult } from './session.js';
 import { adapters, defaultAgentName } from './agents/registry.js';
 
 export type ExecutionError =
@@ -19,11 +19,12 @@ export type RunStatus =
 
 export type RunEvent =
   | { kind: 'iteration-start'; iteration: number; limit: number }
+  | { kind: 'agent-output'; stream: 'stdout' | 'stderr'; chunk: Buffer }
   | { kind: 'execution-error'; error: ExecutionError; stderrTail: string[] }
   | { kind: 'retry'; iteration: number }
   | { kind: 'fail'; summary: string };
 
-export type SessionRunner = (config: SessionConfig, signal: AbortSignal) => Promise<SessionResult>;
+export type SessionRunner = (config: SessionConfig, signal: AbortSignal, onOutput?: AgentOutput) => Promise<SessionResult>;
 export type Reporter = (event: RunEvent) => void;
 
 /** Apply the code-skill outcome policy without inspecting project state. */
@@ -41,7 +42,7 @@ export async function runLoop(options: RunOptions, runSession: SessionRunner, re
     if (signal.aborted) return { kind: 'interrupted' };
     report({ kind: 'iteration-start', iteration, limit: options.maxIterations });
     if (signal.aborted) return { kind: 'interrupted' };
-    const result = await runSession(config, signal);
+    const result = await runSession(config, signal, (stream, chunk) => report({ kind: 'agent-output', stream, chunk }));
     if (signal.aborted || result.kind === 'aborted') return { kind: 'interrupted' };
     if (result.kind === 'timed-out') return { kind: 'timeout', duration: options.sessionTimeout ?? 0 };
 

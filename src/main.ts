@@ -13,9 +13,8 @@ function describeError(error: ExecutionError): string {
   }
 }
 
-function reportExecutionError(error: ExecutionError, stderrTail: string[]): void {
+function reportExecutionError(error: ExecutionError): void {
   process.stderr.write(`[afk] Execution error: ${describeError(error)}\n`);
-  for (const line of stderrTail) process.stderr.write(`${line}\n`);
 }
 
 function report(event: RunEvent): void {
@@ -23,8 +22,11 @@ function report(event: RunEvent): void {
     case 'iteration-start':
       process.stderr.write(`[afk] Iteration ${event.iteration}/${event.limit}: starting agent session\n`);
       break;
+    case 'agent-output':
+      (event.stream === 'stdout' ? process.stdout : process.stderr).write(event.chunk);
+      break;
     case 'execution-error':
-      reportExecutionError(event.error, event.stderrTail);
+      reportExecutionError(event.error);
       break;
     case 'retry':
       process.stderr.write(`[afk] Retrying with fresh session ${event.iteration}\n`);
@@ -84,7 +86,7 @@ if (invocation.kind === 'help') {
     } else {
       switch (status.kind) {
         case 'blocked': process.stderr.write(`[afk] Run blocked: ${status.blockerText}\n`); break;
-        case 'execution-error': reportExecutionError(status.error, status.stderrTail); break;
+        case 'execution-error': reportExecutionError(status.error); break;
         case 'iteration-limit': process.stderr.write(`[afk] Iteration limit reached (${status.limit}) without reported completion\n`); break;
         case 'timeout': process.stderr.write(`[afk] agent session timed out after ${status.duration} seconds\n`); break;
       }

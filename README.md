@@ -45,3 +45,5 @@ The current directory is the workspace unless `--cwd <directory>` selects anothe
 - **Claude Code (`--agent claude`)**: Install and authenticate the `claude` CLI. The `auto` permission mode must be available for your account and selected model. Make the `code` skill discoverable by Claude Code, for example under `.claude/skills` in the workspace. `afk` launches Claude in non-interactive print mode with JSON output and `--permission-mode auto`, sends the prompt on stdin, and reads the JSON `result`. It passes `--model` to Claude's `--model` and `--reasoning-effort` to Claude's `--effort`.
 
 Both agents use `--cwd`, `--max-iterations`, and `--session-timeout` in the shared harness. Model and reasoning effort overrides are passed only when supplied; otherwise each agent uses its own configuration. `afk` does not translate or validate these values for the selected agent.
+
+Agent stdout and stderr are shown as they arrive. `afk` continues to use the captured stdout to read the final response. Codex normally emits activity on stderr; Claude's JSON output may arrive only when its session finishes.

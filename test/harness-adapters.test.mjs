@@ -45,12 +45,12 @@ for (const adapter of adapters.values()) {
     ]) {
       const result = run([scenario], scenario === 'repeat' || scenario === 'fail' ? ['--max-iterations', '1'] : []);
       assert.equal(result.status, code, result.stderr);
-      assert.equal(result.stdout, '');
+      assert.match(result.stdout, new RegExp(scenario));
       assert.deepEqual(result.stderr.trimEnd().split('\n'), lines);
     }
   }));
 
-  test(`${adapter.name}: execution errors retry once and expose only the last 20 stderr lines`, () => withAgent(adapter, ({ run, env, root }) => {
+  test(`${adapter.name}: execution errors retry once and stream diagnostics once`, () => withAgent(adapter, ({ run, env, root }) => {
     const diagnostics = Array.from({ length: 25 }, (_, index) => `detail ${index + 1}`);
     const result = spawnSync(process.execPath, [main, '--agent', adapter.name, '--max-iterations', '3', 'task'], {
       cwd: root,
@@ -58,13 +58,14 @@ for (const adapter of adapters.values()) {
       encoding: 'utf8', timeout: 10000,
     });
     assert.equal(result.status, 1, result.stderr);
-    assert.equal(result.stdout, '');
+    assert.match(result.stdout, /blocked/);
     assert.deepEqual(result.stderr.trimEnd().split('\n'), [
       '[afk] Iteration 1/3: starting agent session',
+      ...diagnostics,
       '[afk] Execution error: agent exited unsuccessfully with exit code 7',
-      ...diagnostics.slice(-20),
       '[afk] Retrying with fresh session 2',
       '[afk] Iteration 2/3: starting agent session',
+      ...diagnostics,
       '[afk] Run blocked: needs input',
     ]);
     const exhausted = run(['missing', 'missing']);
@@ -84,16 +85,17 @@ for (const adapter of adapters.values()) {
     ]);
   }));
 
-  test(`${adapter.name}: timeout stops without a retry or agent stderr`, () => withAgent(adapter, ({ run }) => {
+  test(`${adapter.name}: timeout stops without a retry after streaming agent stderr`, () => withAgent(adapter, ({ run }) => {
     const result = run(['hang'], ['--session-timeout', '0.8']);
     assert.equal(result.status, 2, result.stderr);
     assert.deepEqual(result.stderr.trimEnd().split('\n'), [
       '[afk] Iteration 1/3: starting agent session',
+      'hidden diagnostic',
       '[afk] agent session timed out after 0.8 seconds',
     ]);
   }));
 
-  test(`${adapter.name}: interruption stops without a retry or agent stderr`, { timeout: 10000 }, async () => {
+  test(`${adapter.name}: interruption stops without a retry after streaming agent stderr`, { timeout: 10000 }, async () => {
     await withAgent(adapter, async ({ env, root }) => {
       const child = spawn(process.execPath, [main, '--agent', adapter.name, '--max-iterations', '3', 'task'], {
         cwd: root, env: { ...env, AFK_SCENARIOS: '["hang"]' }, stdio: ['ignore', 'pipe', 'pipe'],
@@ -115,6 +117,7 @@ for (const adapter of adapters.values()) {
       assert.equal(stdout, '');
       assert.deepEqual(stderr.trimEnd().split('\n'), [
         '[afk] Iteration 1/3: starting agent session',
+        'hidden diagnostic',
         '[afk] Interrupted by Ctrl+C',
       ]);
       assert.equal(readFileSync(env.AFK_COUNT, 'utf8'), '1');
@@ -127,7 +130,8 @@ test('the same scenario reports identical output and exit code for every registe
   for (const adapter of adapters.values()) {
     results.push(await withAgent(adapter, ({ run }) => {
       const result = run(['violation', 'blocked']);
-      return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+      assert.match(result.stdout, /blocked/);
+      return { status: result.status, stderr: result.stderr };
     }));
   }
   assert.ok(results.length > 1, 'comparison requires at least two registered adapters');

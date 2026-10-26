@@ -52,7 +52,7 @@ test('each prompt source launches Codex with the selected workspace and original
   ]) {
     const result = launch(args, { input });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, '');
+    assert.equal(result.stdout, '{"outcome":"complete"}');
     assert.match(result.stderr, /\[afk\] Feature completed/);
     const call = JSON.parse(readFileSync(join(root, 'args'), 'utf8'));
     assert.equal(call.cwd, realpathSync(workspace));
@@ -120,13 +120,14 @@ test('all final outcomes report a clear status and consistent exit code', () => 
     const result = launch([...args, 'prompt'], { env: { AFK_OUTCOMES: JSON.stringify([outcome]) } });
     assert.equal(result.status, code, `${outcome}: ${result.stderr}`);
     assert.match(result.stderr, message, outcome);
-    assert.equal(result.stdout, '', outcome);
-    assert.doesNotMatch(result.stdout, /agent diagnostic/, outcome);
-    assert.doesNotMatch(result.stdout, /\{"outcome":/, outcome);
+    assert.equal(result.stdout, outcome === 'missing' || outcome === 'exit' || outcome === 'timeout' ? ''
+      : outcome === 'invalid' ? 'not JSONnot JSON'
+        : JSON.stringify(outcome === 'blocked' ? { outcome, blocker_text: 'needs credentials' }
+          : outcome === 'fail' ? { outcome, failure_summary: 'test failed' } : { outcome }), outcome);
     assert.match(result.stderr, /^\[afk\] Iteration 1\/\d+: starting agent session/m, outcome);
     if (outcome === 'fail') assert.match(result.stderr, /\[afk\] Task failed: test failed/);
     if (['exit', 'missing', 'invalid'].includes(outcome)) assert.match(result.stderr, /\[afk\] Retrying with fresh session 2/);
-    if (!['exit', 'missing', 'invalid'].includes(outcome)) assert.doesNotMatch(result.stderr, /agent diagnostic/, outcome);
+    if (outcome !== 'timeout') assert.match(result.stderr, /agent diagnostic/, outcome);
   }
 }));
 
@@ -140,13 +141,13 @@ test('a Codex launch failure is reported after one retry', () => fixture(({ laun
   assert.doesNotMatch(result.stderr, /codex/i);
 }));
 
-test('execution errors show only the last 20 agent stderr lines after each error', () => fixture(({ launch }) => {
+test('execution errors stream every diagnostic once without repeating the stderr tail', () => fixture(({ launch }) => {
   const lines = Array.from({ length: 25 }, (_, index) => `diagnostic ${index + 1}`);
   const result = launch(['--max-iterations', '2', 'prompt'], { env: { AFK_OUTCOMES: '["exit"]', AFK_STDERR_LINES: JSON.stringify(lines) } });
   assert.equal(result.status, 1, result.stderr);
-  const expectedTail = lines.slice(-20).join('\n') + '\n';
-  assert.equal(result.stderr.split(expectedTail).length - 1, 2);
-  assert.doesNotMatch(result.stderr, /diagnostic [1-5]\n/);
+  const expectedOutput = lines.join('\n') + '\n';
+  assert.equal(result.stderr.split(expectedOutput).length - 1, 2);
+  assert.equal(result.stderr.split('diagnostic 1\n').length - 1, 2);
   assert.match(result.stderr, /\[afk\] Execution error: agent exited unsuccessfully with exit code 7\n/);
   assert.match(result.stderr, /\[afk\] Retrying with fresh session 2/);
   assert.doesNotMatch(result.stderr, /Codex|afk:/);
@@ -190,7 +191,7 @@ test('a run leaves the Git workspace and home unchanged', () => fixture(({ works
   assert.equal(readFileSync(join(workspace, 'existing.txt'), 'utf8'), 'existing work');
 }));
 
-test('agent output stays hidden while Codex runs', { timeout: 10000 }, async () => {
+test('agent output streams while Codex runs', { timeout: 10000 }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'afk-live-'));
   const bin = join(root, 'bin');
   mkdirSync(bin);
@@ -208,16 +209,19 @@ setTimeout(() => {
     });
     let sawActivityBeforeExit = false;
     let stderr = '';
-    child.stdout.on('data', chunk => {
+    let stdout = '';
+    child.stdout.on('data', chunk => { stdout += chunk.toString(); });
+    child.stderr.on('data', chunk => {
+      stderr += chunk.toString();
       if (chunk.toString().includes('working now') && child.exitCode === null) sawActivityBeforeExit = true;
     });
-    child.stderr.on('data', chunk => { stderr += chunk.toString(); });
     const status = await new Promise((resolve, reject) => {
       child.once('error', reject);
       child.once('close', resolve);
     });
     assert.equal(status, 0);
-    assert.equal(sawActivityBeforeExit, false);
-    assert.doesNotMatch(stderr, /working now/);
+    assert.equal(sawActivityBeforeExit, true);
+    assert.match(stderr, /working now/);
+    assert.equal(stdout, '{"outcome":"complete"}');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

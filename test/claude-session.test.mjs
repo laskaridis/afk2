@@ -94,7 +94,7 @@ else process.stdout.write(JSON.stringify({ result: outcome === 'violation' ? 'no
       const result = launch([outcome]);
       assert.equal(result.status, code, result.stderr);
       assert.match(result.stderr, expected);
-      assert.equal(result.stdout, '');
+      assert.match(result.stdout, new RegExp(outcome));
     }
     for (const error of ['exit', 'signal', 'invalid-json', 'missing', 'is-error', 'is-error-exit', 'violation']) {
       const result = launch([error, 'complete']);
@@ -127,7 +127,7 @@ test('Claude launch failure retries once and remains an execution error', () => 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('Ctrl+C interrupts Claude without a retry or agent stderr', { timeout: 10000 }, async () => {
+test('Ctrl+C interrupts Claude after streaming its stderr without a retry', { timeout: 10000 }, async () => {
   await withClaude(`
 const fs = require('node:fs');
 fs.writeFileSync(process.env.AFK_CLAUDE_RECORD, String(process.pid));
@@ -151,6 +151,7 @@ setInterval(() => {}, 1000);
     child.kill('SIGINT');
     assert.equal(await done, 130, stderr);
     assert.match(stderr, /Interrupted by Ctrl\+C/);
-    assert.doesNotMatch(stderr, /Retrying|hidden Claude diagnostic/);
+    assert.doesNotMatch(stderr, /Retrying/);
+    assert.match(stderr, /hidden Claude diagnostic/);
   });
 });

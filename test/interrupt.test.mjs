@@ -67,7 +67,7 @@ setInterval(() => {}, 1000);
     assert.ok(Date.now() - interruptedAt < 3000, 'interruption should not wait for the fake task');
     assert.equal(result.code, 130, result.output);
     assert.match(result.output, /interrupt/i);
-    assert.doesNotMatch(result.output, /interrupted agent detail/);
+    assert.match(result.output, /interrupted agent detail/);
     assert.equal(readFileSync(signal, 'utf8'), 'SIGINT');
     assert.throws(() => process.kill(codexPid, 0), /ESRCH/);
     assert.equal(readFileSync(count, 'utf8'), '1');
