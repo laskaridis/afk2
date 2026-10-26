@@ -1,5 +1,6 @@
 ## Project discovery
 - `npm test` builds TypeScript and runs the full Node test suite; fake agent executables are placed on PATH by session and CLI tests.
+- Executable fixtures for the shared harness suite live under `fixtures/agents/`; Node's default test discovery tries to execute fixtures placed under `test/`.
 - The existing CLI flag is `--reasoning-effort`; Codex receives it through `-c model_reasoning_effort=<JSON string>`.
 - The built-in adapter registry is `src/agents/registry.ts`; CLI validation and the run loop both read it, and the session runner requires an adapter.
 - Run status rendering is in `src/main.ts`; execution-error events and terminal status carry the session's `stderrTail` through `src/run.ts`.
@@ -145,4 +146,30 @@
 - Scope deviations:
   - The shared final-message result and generic execution-error shape gained an optional reason so Claude's `subtype` survives the session and reporting boundaries.
 - Follow up needed: TASK-005 shared harness behavior tests remain pending.
+---
+
+## 2026-10-26 15:05:56 UTC
+- Task id: TASK-005
+- What was implemented:
+  - Added a shared CLI harness test suite that iterates every adapter in the built-in registry and requires a matching fake executable fixture.
+  - Added Codex and Claude fixtures that emit final responses on stdout in their real adapter formats; the Codex fixture rejects `--output-last-message`.
+- Files changed:
+  - test/harness-adapters.test.mjs
+  - fixtures/agents/codex.cjs
+  - fixtures/agents/claude.cjs
+  - specs/agent-adapters.plan.json
+  - progress.txt
+- Verification:
+  - RED: `node --test test/harness-adapters.test.mjs` failed because both required fixtures were missing.
+  - GREEN: the shared suite passed for both registered adapters after adding fixtures.
+  - `npm test` passed: 65 tests, 0 failures, with no real agent installation.
+  - Shared per-adapter tests verify complete, blocked, repeat, fail, protocol violation, retry recovery and cap, iteration limit, timeout, Ctrl+C, exact status wording, and last-20-line stderr output with suppression on successful, timed-out, and interrupted sessions.
+  - An explicit registry-to-fixture check fails when a registered adapter has no same-named fixture; adding that fixture requires no change to the shared scenario loop.
+  - A cross-adapter CLI test verifies identical stdout, stderr, and exit code for the same violation-then-blocked sequence. Existing adapter unit tests remain separate.
+  - Read-only review found no concrete completion blocker. Initial broad test run found Node discovering fixture executables under `test/`; moving them to `fixtures/agents/` resolved it.
+- Learnings for future iterations:
+  - Use `fixtures/agents/<adapter.name>.cjs` for shared CLI fixtures; the suite selects them from the registry.
+- Scope deviations:
+  - None.
+- Follow up needed: TASK-006 help and documentation remain pending.
 ---

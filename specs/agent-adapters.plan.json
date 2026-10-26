@@ -81,7 +81,7 @@
     {
       "id": "TASK-005",
       "objective": "Run one shared harness behavior test suite against every registered adapter using a per-agent fake executable fixture.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": ["US-005"],
       "acceptance_criteria_addressed": ["AC-023", "AC-012"],
       "completion_criteria": [
