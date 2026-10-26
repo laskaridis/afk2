@@ -32,6 +32,8 @@ test('the packed package runs its afk executable outside the repository', () => 
 
     const manifest = JSON.parse(readFileSync(join(outside, 'node_modules', packed[0].name, 'package.json'), 'utf8'));
     assert.equal(manifest.bin.afk, './dist/main.js');
+    assert.match(manifest.description, /coding agent/i);
+    assert.doesNotMatch(manifest.description, /Codex/i);
     assert.ok(readdirSync(join(outside, 'node_modules', packed[0].name, 'dist')).includes('main.js'));
   } finally {
     rmSync(outside, { recursive: true, force: true });

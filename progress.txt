@@ -148,6 +148,35 @@
 - Follow up needed: TASK-005 shared harness behavior tests remain pending.
 ---
 
+## 2026-10-26 15:09:02 UTC
+- Task id: TASK-006
+- What was implemented:
+  - Updated help to describe the coding agent, list supported names from the registry and its default, and explain that model and reasoning effort values pass through unchanged.
+  - Updated README with agent-neutral usage, correct exit codes, and per-agent prerequisites, launch mode, and honored settings.
+  - Updated package description to describe coding agents generally.
+- Files changed:
+  - src/cli.ts
+  - README.md
+  - package.json
+  - test/cli.test.mjs
+  - test/main.test.mjs
+  - test/package.test.mjs
+  - specs/agent-adapters.plan.json
+  - progress.txt
+- Verification:
+  - RED: `node --test test/cli.test.mjs test/main.test.mjs test/package.test.mjs` failed on missing `--agent` help text, missing dynamic registry names, and the Codex-only packed package description.
+  - GREEN: `npm run build && node --test test/cli.test.mjs test/main.test.mjs test/package.test.mjs` passed 19 tests; after preserving the prior unknown-option help assertion, `node --test test/cli.test.mjs` passed 8 tests.
+  - `npm test` passed 66 tests, 0 failures; `git diff --check` passed.
+  - AC-004 and AC-024: parser tests verify both help flags, supported names and default, neutral wording, unchanged-value descriptions, and live registry changes. CLI tests verify invalid `--agent` plus help exits 0 without launching a session.
+  - AC-025: README inspection confirms the Supported agents section gives Codex and Claude Code prerequisites, launch modes, model and effort mappings, and shared harness settings.
+  - AC-026: the package test verifies the installed package description contains `coding agent` and does not name Codex alone.
+- Learnings for future iterations:
+  - Help is rendered when requested, so a newly registered adapter appears without editing CLI help text.
+- Scope deviations:
+  - None.
+- Follow up needed: TASK-007 manual smoke check against real agent CLIs remains pending.
+---
+
 ## 2026-10-26 15:05:56 UTC
 - Task id: TASK-005
 - What was implemented:

@@ -75,7 +75,7 @@ test('input and option errors and help never launch Codex', () => fixture(({ inv
     assert.equal(result.stdout, '');
   }
   for (const help of ['--help', '-h']) {
-    const result = launch(['--max-iterations', '0', help], { input: 'ignored' });
+    const result = launch(['--agent', 'unsupported', '--max-iterations', '0', help], { input: 'ignored' });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Usage: afk/);
     for (const code of ['0', '1', '2', '130']) assert.match(result.stdout, new RegExp(`\\b${code}\\b`));

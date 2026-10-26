@@ -86,12 +86,30 @@ test('rejects invalid option values and unknown options', () => withDirectory((c
 
 test('help takes precedence and describes options and exit codes', () => withDirectory((cwd) => {
   for (const flag of ['--help', '-h']) {
-    const result = parseInvocation(['--unknown', '--max-iterations', '0', flag], 'prompt', cwd);
-    assert.equal(result.kind, 'help');
-    for (const item of ['--prompt-file', '--cwd', '--model', '--reasoning-effort', '--max-iterations', '--session-timeout', 'Exit codes']) {
+    for (const invalidOptions of [['--unknown'], ['--agent', 'unsupported', '--max-iterations', '0']]) {
+      assert.equal(parseInvocation([...invalidOptions, flag], 'prompt', cwd).kind, 'help');
+    }
+    const result = parseInvocation(['--agent', 'unsupported', '--max-iterations', '0', flag], 'prompt', cwd);
+    for (const item of ['--prompt-file', '--cwd', '--agent <name>', '--model', '--reasoning-effort', '--max-iterations', '--session-timeout', 'Exit codes']) {
       assert.match(result.text, new RegExp(item));
     }
+    for (const name of adapters.keys()) assert.match(result.text, new RegExp(`\\b${name}\\b`));
+    assert.match(result.text, /default: codex/);
+    assert.match(result.text, /the coding agent/i);
+    assert.match(result.text, /--model[^\n]*passed to the agent unchanged/i);
+    assert.match(result.text, /--reasoning-effort[^\n]*passed to the agent unchanged/i);
+    assert.doesNotMatch(result.text, /override (?:the )?Codex/i);
   }
+}));
+
+test('help lists newly registered agents without other changes', () => withDirectory((cwd) => {
+  const stub = { name: 'stub', executable: 'stub', buildArgs: () => [], extractFinalMessage: () => ({ kind: 'missing' }) };
+  adapters.set(stub.name, stub);
+  try {
+    const result = parseInvocation(['--help'], null, cwd);
+    assert.equal(result.kind, 'help');
+    assert.match(result.text, /stub/);
+  } finally { adapters.delete(stub.name); }
 }));
 
 test('selects a registered agent and rejects empty or unsupported names', () => withDirectory((cwd) => {

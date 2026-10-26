@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { adapters, supportedAgentNames } from './agents/registry.js';
+import { adapters, defaultAgentName, supportedAgentNames } from './agents/registry.js';
 
 export interface RunOptions {
   prompt: string;
@@ -17,7 +17,9 @@ export type Invocation =
   | { kind: 'help'; text: string }
   | { kind: 'error'; category: 'input' | 'option'; message: string };
 
-export const usage = `Usage: afk [options] [prompt]
+export const usage = () => `Usage: afk [options] [prompt]
+
+Run the coding agent on a prepared task in fresh sessions.
 
 Prompt sources (choose exactly one):
   [prompt]                     Launch prompt as one positional argument
@@ -26,8 +28,9 @@ Prompt sources (choose exactly one):
 
 Options:
   --cwd <directory>            Workspace directory (default: current directory)
-  --model <model>              Override the Codex model
-  --reasoning-effort <effort>   Override Codex reasoning effort
+  --agent <name>               Coding agent (${supportedAgentNames().join(', ')}; default: ${defaultAgentName})
+  --model <model>              Model value passed to the agent unchanged
+  --reasoning-effort <effort>   Reasoning effort value passed to the agent unchanged
   --max-iterations <count>     Maximum session launches (default: 10)
   --session-timeout <seconds>  Timeout for each session (default: none)
   -h, --help                   Show this help
@@ -35,7 +38,7 @@ Options:
 Exit codes:
   0  Feature completed, or help displayed
   1  Input error, blocker, execution error, or iteration limit
-  2  Session timeout
+  2  Option error or session timeout
   130  Interrupted by Ctrl+C
 `;
 
@@ -49,7 +52,7 @@ const inputError = (message: string): Invocation => ({ kind: 'error', category: 
 
 /** stdin is null when attached to a terminal; a string when piped. */
 export function parseInvocation(argv: string[], stdin: string | null, cwd: string): Invocation {
-  if (argv.includes('--help') || argv.includes('-h')) return { kind: 'help', text: usage };
+  if (argv.includes('--help') || argv.includes('-h')) return { kind: 'help', text: usage() };
 
   let positional: string | undefined;
   let promptFile: string | undefined;

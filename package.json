@@ -2,7 +2,7 @@
   "name": "afk-cli-core",
   "version": "0.1.0",
   "private": false,
-  "description": "Run an unattended Codex coding loop in a prepared workspace",
+  "description": "Run an unattended coding agent loop in a prepared workspace",
   "type": "module",
   "engines": {
     "node": ">=22"
