@@ -202,3 +202,21 @@
   - None.
 - Follow up needed: TASK-006 help and documentation remain pending.
 ---
+
+## 2026-10-26 15:10:33 UTC
+- Task id: TASK-007
+- What was implemented:
+  - Began the manual smoke check; left TASK-007 pending because the required real-agent run was rejected by automatic approval review before it started.
+- Files changed:
+  - progress.txt
+- Verification:
+  - Installed versions: `codex-cli 0.164.0` and `Claude Code 2.1.310`.
+  - The requested `codex exec --approve-for-me -o <file> -` check was rejected before execution. Automatic approval review said this would grant Codex autonomous execution in the project workspace with possible file changes or access to sensitive resources, without explicit authorization for that broad mode.
+  - The piped-stdout comparison and both end-to-end `afk --agent` runs were not performed; AC-027 is unverified.
+  - `npm test` passed: 66 tests, 0 failures. This checks fake fixtures and does not replace the manual real-agent check.
+- Learnings for future iterations:
+  - The real-agent smoke check needs explicit authorization for the `--approve-for-me` / `auto` permission runs after automatic approval review rejected the Codex command.
+- Scope deviations:
+  - None; no source files changed.
+- Follow up needed: Resume TASK-007 with approval for real Codex and Claude CLI smoke runs, then record stdout and output-file comparison, blocked run statuses and exit codes, and Claude JSON field observations.
+---
