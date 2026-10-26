@@ -220,3 +220,25 @@
   - None; no source files changed.
 - Follow up needed: Resume TASK-007 with approval for real Codex and Claude CLI smoke runs, then record stdout and output-file comparison, blocked run statuses and exit codes, and Claude JSON field observations.
 ---
+
+## 2026-10-26 15:50:40 UTC
+- Task id: TASK-007
+- What was implemented:
+  - Completed the manual smoke check in `/private/tmp/afk-agent-smoke.euIXf6`, a disposable Git workspace with the code skill linked for both agents.
+  - Recorded a real-agent output leakage defect as pending TASK-008; validation made no source changes.
+- Files changed:
+  - specs/agent-adapters.plan.json
+  - progress.txt
+- Verification:
+  - Installed versions: `codex-cli 0.164.0` and `Claude Code 2.1.310`.
+  - `codex exec --approve-for-me -o /private/tmp/afk-agent-smoke.euIXf6/codex-final.txt -` with piped stdout exited 0. The output file and captured stdout both trimmed to `smoke-check-ok`; the byte counts were 14 and 15 because of surrounding whitespace.
+  - `afk --agent codex` and `afk --agent claude` each ran once in the scratch workspace with a prompt naming no spec or task list. Each exited 1 and printed `[afk] Run blocked: ...` after one iteration.
+  - Real Claude JSON had a non-empty string `result`, `is_error: false`, and `subtype: "success"`, matching the adapter's success assumptions.
+  - Mismatch: the real Codex run forwarded its protocol JSON to afk stdout and its CLI activity to afk stderr; the real Claude run forwarded the full JSON result to afk stdout. `src/run.ts` emits `agent-output` events from every chunk and `src/main.ts` writes those chunks to process stdout/stderr. This violates AC-010, AC-016, and AC-018, and can break AC-012. TASK-008 is the follow-up fix.
+  - `npm test` passed 66 tests, 0 failures; existing fake-fixture tests currently expect streamed output and did not catch this requirement mismatch.
+- Learnings for future iterations:
+  - The session runner captures output, but the run loop and reporter currently forward its chunks live; TASK-008 should adjust those boundaries and the shared harness assertions.
+- Scope deviations:
+  - None; only the authorized plan and progress bookkeeping files changed.
+- Follow up needed: TASK-008 must remove live agent output forwarding and update the shared harness tests while preserving the execution-error stderr tail.
+---

@@ -115,7 +115,7 @@
     {
       "id": "TASK-007",
       "objective": "Record manual smoke-check evidence that both adapters work against the real Codex and Claude Code CLIs.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": ["US-007"],
       "acceptance_criteria_addressed": ["AC-027"],
       "completion_criteria": [
