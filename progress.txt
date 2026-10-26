@@ -54,3 +54,29 @@
 - Follow up needed:
   - TASK-004 is the next ready task.
 ---
+
+## 2026-10-26 13:04:49 UTC
+- Task id: TASK-004
+- What was implemented:
+  - Added the session process boundary: fresh Codex exec with automatic review, optional model and reasoning-effort overrides, live output, and a dedicated final-message file.
+  - Added timeout and abort termination, typed execution results, and removal of the temporary response directory.
+  - Added fake-Codex tests for launch behavior, final-message isolation, error results, timeout, abort, and cleanup.
+- Files changed:
+  - src/session.ts
+  - test/session.test.mjs
+  - specs/afk-cli-core.plan.json
+  - progress.txt
+- Verification:
+  - RED: `npm run build && node --test test/session.test.mjs` failed because the session module was missing.
+  - GREEN: the same command passed all six initial session tests; a later check passed seven tests after adding two edge cases.
+  - Broad check: `npm test` passed all 17 tests.
+  - Fake Codex assertions confirm fresh `exec`, selected cwd, original prompt and skill instructions, explicit automatic review, inherited overrides when absent, supplied overrides when present, live stdout/stderr, dedicated last-message output, typed launch/exit/timeout/abort results, child termination, and temp cleanup.
+  - Verified CLI flags with `codex exec --help` and Context7 Codex CLI documentation; an independent read-only review found no completion blocker.
+- Learnings for future iterations:
+  - `runSession(config, signal, activity?)` returns `aborted` in addition to the design's session result variants so the run loop can report interruption.
+  - The run loop can treat an empty successful final message as a protocol violation; the session runner does not parse it.
+- Scope deviations:
+  - None.
+- Follow up needed:
+  - TASK-005 is the next ready task.
+---

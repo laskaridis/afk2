@@ -98,7 +98,7 @@
     {
       "id": "TASK-004",
       "objective": "Provide a session runner that launches one fresh non-interactive Codex session in the workspace, streams its activity live, captures its final message separately, and reports a typed result.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": [
         "US-002",
         "US-003",
@@ -132,6 +132,12 @@
       ],
       "dependencies": [
         "TASK-001"
+      ],
+      "verification": [
+        "codex exec --help and Context7 Codex CLI documentation confirmed exec, --approve-for-me, --output-last-message, --model, and -c model_reasoning_effort syntax.",
+        "RED: npm run build && node --test test/session.test.mjs failed because dist/session.js was absent; GREEN: the same command passed all six initial session tests.",
+        "Fake Codex tests verify fresh exec in selected cwd, skill instructions plus original prompt, optional overrides, live stdout/stderr, dedicated final-message file, missing final message, launch and exit failures, timeout and abort termination, and temporary-file cleanup.",
+        "npm test passed all 17 tests after adding the nonzero-exit-with-valid-final-message and already-aborted-signal checks; independent read-only review found no completion blocker."
       ]
     },
     {
