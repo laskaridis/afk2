@@ -225,7 +225,7 @@
     {
       "id": "TASK-007",
       "objective": "Wire the modules into the `afk` executable so a complete invocation produces the specified terminal output and exit codes end-to-end.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": [
         "US-001",
         "US-003",
@@ -257,6 +257,13 @@
         "TASK-003",
         "TASK-005",
         "TASK-006"
+      ],
+      "verification": [
+        "RED: npm run build && node --test test/main.test.mjs failed for piped stdin handling and missing blocker detail; GREEN: the focused test passed after wiring stdin, reporter events, final status messages and exit codes.",
+        "Built afk end-to-end tests cover positional, file and stdin prompts; invalid inputs and help without Codex launch; completion, blocker, launch/exit/missing/invalid response errors, iteration limit, timeout and live activity.",
+        "The existing interruption integration test covers Ctrl+C exit 130 and no further Codex sessions; a Git fixture verifies branch, worktree list, workspace files and HOME stay unchanged.",
+        "Help and README agree on exit codes 0, 1, 2 and 130. Independent read-only review found no implementation blocker.",
+        "npm test passed all 32 tests after running test files serially to avoid existing process-start timing races under parallel load."
       ]
     }
   ]

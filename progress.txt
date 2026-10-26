@@ -128,3 +128,30 @@
 - Follow up needed:
   - TASK-007 is the next ready task.
 ---
+
+## 2026-10-26 13:16:15 UTC
+- Task id: TASK-007
+- What was implemented:
+  - Wired the built afk entrypoint to piped stdin, run event reporting, detailed final statuses and documented exit codes.
+  - Added end-to-end fake-Codex tests and a README for installation prerequisites and usage.
+  - Made the npm test command run test files serially so process timing tests remain stable under the expanded suite.
+- Files changed:
+  - src/main.ts
+  - test/main.test.mjs
+  - README.md
+  - package.json
+  - specs/afk-cli-core.plan.json
+  - progress.txt
+- Verification:
+  - Scenarios: three prompt sources; invalid input/options and help with zero launches; complete, blocked, execution error, iteration limit, timeout and interruption statuses; live output; unchanged Git workspace and HOME.
+  - RED: `npm run build && node --test test/main.test.mjs` failed on piped stdin and missing blocker detail. GREEN: the focused test passed after entrypoint wiring.
+  - `npm test` passed all 32 tests, including the existing Ctrl+C integration test and package installation test.
+  - Independent read-only review found no TASK-007 implementation blocker; it identified a pre-existing process timing race under parallel test load, addressed by the serial test command.
+  - Help, README and code use exit codes 0 for completion/help, 1 for ordinary errors, 2 for timeout and 130 for interruption.
+- Learnings for future iterations:
+  - Built-CLI integration tests launch fake Codex via PATH and keep its records outside the workspace so workspace purity can be checked.
+- Scope deviations:
+  - package.json test command runs files serially because parallel process tests failed intermittently before the new end-to-end suite could pass reliably.
+- Follow up needed:
+  - None; all planned tasks are complete.
+---
