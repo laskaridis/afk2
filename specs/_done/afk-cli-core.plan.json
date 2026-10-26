@@ -32,7 +32,7 @@
     {
       "id": "TASK-002",
       "objective": "Provide a response-protocol validator that accepts a final assistant message only when it is exactly one valid code-skill JSON response object.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": [
         "US-002"
       ],
@@ -51,6 +51,12 @@
       ],
       "dependencies": [
         "TASK-001"
+      ],
+      "verification": [
+        "npm run build && node --test test/protocol.test.mjs passed all four protocol tests after the initial RED failure for the missing protocol module.",
+        "The tests accept repeat and complete with leading/trailing whitespace and no extra fields, and blocked/fail only with their required non-empty string details.",
+        "The tests reject prose, fenced JSON, empty input, multiple JSON values, non-object JSON, missing fields, empty or non-string details, extra fields and unknown outcomes.",
+        "The exported parseResponse function returns a discriminated Response union or Violation; npm test passed all five tests including package integration."
       ]
     },
     {

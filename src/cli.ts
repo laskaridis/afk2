@@ -37,6 +37,11 @@ Exit codes:
   130  Interrupted by Ctrl+C
 `;
 
+export const missingPromptMessage = 'Missing prompt: provide an argument, --prompt-file, or piped stdin.';
+
+/** Largest delay setTimeout accepts (2^31-1 ms), in seconds. */
+const maxSessionTimeout = 2147483;
+
 const optionError = (message: string): Invocation => ({ kind: 'error', category: 'option', message });
 const inputError = (message: string): Invocation => ({ kind: 'error', category: 'input', message });
 
@@ -84,8 +89,11 @@ export function parseInvocation(argv: string[], stdin: string | null, cwd: strin
       }
       case '--session-timeout': {
         const seconds = Number(value);
-        if (!Number.isFinite(seconds) || seconds <= 0) {
+        if (!/^\d+(\.\d+)?$/.test(value) || seconds <= 0) {
           return optionError('--session-timeout requires positive seconds.');
+        }
+        if (seconds > maxSessionTimeout) {
+          return optionError(`--session-timeout must not exceed ${maxSessionTimeout} seconds.`);
         }
         sessionTimeout = seconds;
         break;
@@ -101,7 +109,7 @@ export function parseInvocation(argv: string[], stdin: string | null, cwd: strin
 
   const sourceCount = Number(positional !== undefined) + Number(promptFile !== undefined) + Number(stdin !== null);
   if (sourceCount > 1) return inputError('Multiple prompt sources were provided.');
-  if (sourceCount === 0) return inputError('Missing prompt: provide an argument, --prompt-file, or piped stdin.');
+  if (sourceCount === 0) return inputError(missingPromptMessage);
 
   let prompt = positional ?? stdin ?? '';
   if (promptFile !== undefined) {

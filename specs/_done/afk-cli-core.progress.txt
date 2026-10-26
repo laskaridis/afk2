@@ -31,6 +31,29 @@
   - TASK-002 is the next ready task.
 ---
 
+## 2026-10-26 12:48:36 UTC
+- Task id: TASK-002
+- What was implemented:
+  - Added a typed response-protocol validator for the four code-skill outcomes and a violation result.
+  - Added tests for all valid outcomes and malformed, missing, extra, or incorrectly typed response content.
+- Files changed:
+  - src/protocol.ts
+  - test/protocol.test.mjs
+  - specs/afk-cli-core.plan.json
+  - progress.txt
+- Verification:
+  - RED: `npm test` failed because the protocol module did not exist.
+  - GREEN: `npm run build && node --test test/protocol.test.mjs` passed all four protocol tests.
+  - Broad check: `npm test` passed all five tests, including the existing package integration test.
+  - Checked every TASK-002 completion criterion against the tests and exported TypeScript types: valid four-way outcome typing, required details, exact allowed fields, permitted outer whitespace, and rejection cases are covered.
+- Learnings for future iterations:
+  - Import `parseResponse` from `protocol.ts` in the run loop; its violation result is `{ kind: 'violation' }`.
+- Scope deviations:
+  - None.
+- Follow up needed:
+  - TASK-003 or TASK-004 is ready next.
+---
+
 ## 2026-10-26 12:59:24 UTC
 - Task id: TASK-003
 - What was implemented:

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { parseInvocation } from './cli.js';
+import { missingPromptMessage, parseInvocation } from './cli.js';
 import { runLoop } from './run.js';
 import type { ExecutionError, RunEvent } from './run.js';
 import { runSession } from './session.js';
@@ -31,14 +31,30 @@ function report(event: RunEvent): void {
 }
 
 const args = process.argv.slice(2);
-let stdin: string | null = null;
-if (!args.includes('--help') && !args.includes('-h') && !process.stdin.isTTY) {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
-  const input = Buffer.concat(chunks).toString('utf8');
-  if (input.length > 0) stdin = input;
+/** Read piped stdin to EOF, or with `graceMs` give up on a pipe that stays silent and open. */
+function readStdin(graceMs?: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    const finish = () => {
+      clearTimeout(timer);
+      process.stdin.destroy();
+      const input = Buffer.concat(chunks).toString('utf8');
+      resolve(input.length > 0 ? input : null);
+    };
+    const timer = graceMs === undefined ? undefined : setTimeout(finish, graceMs);
+    process.stdin.on('data', (chunk: Buffer) => chunks.push(chunk));
+    process.stdin.on('end', finish);
+    process.stdin.on('error', finish);
+  });
 }
-const invocation = parseInvocation(args, stdin, process.cwd());
+
+// A prompt given by argument or file must not block on a pipe that never closes.
+let invocation = parseInvocation(args, null, process.cwd());
+if (invocation.kind !== 'help' && !process.stdin.isTTY) {
+  const missing = invocation.kind === 'error' && invocation.message === missingPromptMessage;
+  const stdin = await readStdin(missing ? undefined : 200);
+  if (stdin !== null) invocation = parseInvocation(args, stdin, process.cwd());
+}
 if (invocation.kind === 'help') {
   process.stdout.write(invocation.text);
 } else if (invocation.kind === 'error') {
@@ -46,13 +62,18 @@ if (invocation.kind === 'help') {
   process.exitCode = 1;
 } else {
   const controller = new AbortController();
-  const interrupt = () => controller.abort();
-  process.on('SIGINT', interrupt);
+  const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+  let received: (typeof signals)[number] | undefined;
+  const handlers = signals.map((name) => {
+    const handler = () => { received ??= name; controller.abort(); };
+    process.on(name, handler);
+    return [name, handler] as const;
+  });
   try {
     const status = await runLoop(invocation.options, runSession, report, controller.signal);
     if (status.kind === 'interrupted') {
-      process.stderr.write('afk: interrupted by Ctrl+C\n');
-      process.exitCode = 130;
+      process.stderr.write(received === 'SIGTERM' || received === 'SIGHUP' ? `afk: interrupted by ${received}\n` : 'afk: interrupted by Ctrl+C\n');
+      process.exitCode = received === 'SIGTERM' ? 143 : received === 'SIGHUP' ? 129 : 130;
     } else if (status.kind === 'completed') {
       process.stdout.write('afk: feature completed\n');
     } else {
@@ -65,6 +86,6 @@ if (invocation.kind === 'help') {
       process.exitCode = status.kind === 'timeout' ? 2 : 1;
     }
   } finally {
-    process.off('SIGINT', interrupt);
+    for (const [name, handler] of handlers) process.off(name, handler);
   }
 }

@@ -44,23 +44,29 @@ export async function runSession(config: SessionConfig, signal: AbortSignal, act
 
   try {
     return await new Promise<SessionResult>((resolve) => {
-      const child = spawn('codex', args, { cwd: config.cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      const child = spawn('codex', args, { cwd: config.cwd, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
       let launchError: Error | undefined;
       let stopped: 'timeout' | 'abort' | undefined;
       let timeout: NodeJS.Timeout | undefined;
       let terminate: NodeJS.Timeout | undefined;
       let kill: NodeJS.Timeout | undefined;
 
+      // The child leads its own process group, so descendants are signalled too.
+      const signalGroup = (name: NodeJS.Signals) => {
+        try { process.kill(-child.pid!, name); }
+        catch { child.kill(name); }
+      };
+
       const stop = (reason: 'timeout' | 'abort') => {
         if (stopped || child.exitCode !== null || child.signalCode !== null) return;
         stopped = reason;
-        child.kill('SIGINT');
+        signalGroup('SIGINT');
         terminate = setTimeout(() => {
-          if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
-        }, 500);
+          if (child.exitCode === null && child.signalCode === null) signalGroup('SIGTERM');
+        }, 2000);
         kill = setTimeout(() => {
-          if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
-        }, 1000);
+          if (child.exitCode === null && child.signalCode === null) signalGroup('SIGKILL');
+        }, 5000);
       };
 
       const onAbort = () => stop('abort');
