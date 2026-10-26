@@ -1,0 +1,1 @@
+Read spec/agent-adapters.spec.md and implement spec/agent-adapters.plan.json
