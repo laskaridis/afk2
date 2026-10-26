@@ -111,3 +111,38 @@
   - `src/session.ts` now reports the launch error code instead of Node's raw message because that message includes the executable name and violates agent-neutral wording.
 - Follow up needed: TASK-004 Claude adapter and error classification remain pending.
 ---
+
+## 2026-10-26 15:02:08 UTC
+- Task id: TASK-004
+- What was implemented:
+  - Added and registered a stateless Claude adapter using print mode, JSON output, auto permissions, and optional raw model/effort overrides.
+  - Classified Claude JSON results, parse failures, missing messages, and structured `is_error` results; carried the reported subtype through the shared execution-error path on exit 0 and non-zero exit.
+  - Kept the shared run loop and protocol parser agent-neutral, with existing retry, timeout, and interruption policy.
+- Files changed:
+  - src/agents/claude.ts
+  - src/agents/registry.ts
+  - src/agents/types.ts
+  - src/session.ts
+  - src/run.ts
+  - src/main.ts
+  - test/agents-claude.test.mjs
+  - test/claude-session.test.mjs
+  - specs/agent-adapters.plan.json
+  - progress.txt
+- Verification:
+  - RED: `node --test test/agents-claude.test.mjs` failed because the Claude adapter module did not exist.
+  - GREEN: `npm run build && node --test test/agents-claude.test.mjs test/claude-session.test.mjs` passed after correcting a test fixture's malformed JSON and resolving the macOS `/var` symlink in a cwd assertion.
+  - `npm test` passed: 55 tests, 0 failures.
+  - AC-006: unit and fake executable session tests verify `-p --output-format json --permission-mode auto`, stdin prompt, workspace cwd, absent overrides by default, and unchanged model/effort values when supplied; source inspection confirms no full-access mode.
+  - AC-007: fake Claude CLI tests verify complete, blocked, repeat, and fail JSON `result` messages follow the existing protocol outcomes.
+  - AC-008: adapter and fake session tests cover launch failure, non-zero exit, signal termination, malformed JSON on exit 0, structured `is_error` on exits 0 and 7 with subtype in reporting, empty or missing/non-string result, and protocol violation. CLI tests verify each execution error retries once; launch failure also retries once.
+  - AC-009: a hanging fake Claude session times out with exit 2 and no retry; Ctrl+C terminates an active fake Claude session with exit 130, no retry, and no agent stderr shown.
+  - AC-021: the adapter consumes only supported settings; the shared runner passes settings without validation or warnings.
+  - Independent read-only review found no concrete TASK-004 completion blocker.
+- Learnings for future iterations:
+  - Claude's structured error can be reported on non-zero exit only if the shared runner extracts stdout before final exit classification.
+  - The fake Claude fixture in `test/claude-session.test.mjs` emits a JSON object with `result`; TASK-005 can consolidate this into the shared harness suite.
+- Scope deviations:
+  - The shared final-message result and generic execution-error shape gained an optional reason so Claude's `subtype` survives the session and reporting boundaries.
+- Follow up needed: TASK-005 shared harness behavior tests remain pending.
+---

@@ -7,7 +7,7 @@ import { runSession } from './session.js';
 function describeError(error: ExecutionError): string {
   switch (error.kind) {
     case 'launch-failed': return `failed to launch agent: ${error.message}`;
-    case 'exit-failed': return error.status === null ? 'agent exited unsuccessfully with signal' : `agent exited unsuccessfully with exit code ${error.status}`;
+    case 'exit-failed': return `${error.status === null ? 'agent exited unsuccessfully with signal' : `agent exited unsuccessfully with exit code ${error.status}`}${error.reason ? `: ${error.reason}` : ''}`;
     case 'missing-response': return 'agent exited without a final response';
     case 'invalid-response': return `agent final response is invalid: ${error.reason}`;
   }

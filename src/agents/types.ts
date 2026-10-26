@@ -1,7 +1,8 @@
 export type FinalMessageResult =
   | { kind: 'message'; text: string }
   | { kind: 'missing' }
-  | { kind: 'invalid'; reason: string };
+  | { kind: 'invalid'; reason: string }
+  | { kind: 'error'; reason: string };
 
 export interface AgentAdapter {
   name: string;

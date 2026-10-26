@@ -63,7 +63,7 @@
     {
       "id": "TASK-004",
       "objective": "Support `--agent claude` by running Claude Code in print mode with JSON output and classifying its results per the spec.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": ["US-002"],
       "acceptance_criteria_addressed": ["AC-006", "AC-007", "AC-008", "AC-009", "AC-021"],
       "completion_criteria": [

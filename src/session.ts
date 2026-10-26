@@ -16,7 +16,7 @@ export type SessionResult =
   | { kind: 'missing-response'; stderrTail: string[] }
   | { kind: 'invalid-response'; reason: string; stderrTail: string[] }
   | { kind: 'launch-failed'; message: string; stderrTail: string[] }
-  | { kind: 'exit-failed'; status: number | null; stderrTail: string[] }
+  | { kind: 'exit-failed'; status: number | null; reason?: string; stderrTail: string[] }
   | { kind: 'timed-out' }
   | { kind: 'aborted' };
 
@@ -90,8 +90,10 @@ export async function runSession(config: SessionConfig, signal: AbortSignal): Pr
         if (stderrTail.length > 20) stderrTail.shift();
       }
       if (launchError) return resolve({ kind: 'launch-failed', message: (launchError as NodeJS.ErrnoException).code ?? 'unknown error', stderrTail });
-      if (status !== 0) return resolve({ kind: 'exit-failed', status, stderrTail });
       const final = adapter.extractFinalMessage(Buffer.concat(stdout).toString('utf8'));
+      if (status !== 0 || final.kind === 'error') {
+        return resolve({ kind: 'exit-failed', status, ...(final.kind === 'error' && status !== null && { reason: final.reason }), stderrTail });
+      }
       if (final.kind === 'missing') return resolve({ kind: 'missing-response', stderrTail });
       if (final.kind === 'invalid') return resolve({ kind: 'invalid-response', reason: final.reason, stderrTail });
       resolve({ kind: 'ok', finalMessage: final.text, stderrTail });
