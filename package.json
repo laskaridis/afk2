@@ -1,0 +1,24 @@
+{
+  "name": "afk-cli-core",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Run an unattended Codex coding loop in a prepared workspace",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "afk": "./dist/main.js"
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test"
+  },
+  "devDependencies": {
+    "@types/node": "22.14.1",
+    "typescript": "5.9.3"
+  }
+}

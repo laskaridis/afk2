@@ -1,0 +1,32 @@
+## Project discovery
+- The repository begins with only the shell prototype; the TypeScript package uses Node 22, ESM and the built `dist/main.js` as its `afk` bin.
+- The default npm cache is not writable in the sandbox; packaging tests use a temporary cache.
+---
+
+## 2026-10-26 12:46:57 UTC
+- Task id: TASK-001
+- What was implemented:
+  - Added an npm-compatible TypeScript package with `build` and `test` scripts, a lockfile, and a minimal executable entrypoint.
+  - Added an automated test that packs and installs the package outside the repository, then runs the `afk` bin.
+- Files changed:
+  - package.json
+  - package-lock.json
+  - tsconfig.json
+  - src/main.ts
+  - test/package.test.mjs
+  - specs/afk-cli-core.plan.json
+  - progress.txt
+- Verification:
+  - RED: `node --test test/package.test.mjs` failed because `package.json` was absent.
+  - GREEN: `npm test` passed; it compiled TypeScript and passed the package integration test (1/1).
+  - The integration test installed a packed tarball in a temporary directory outside the repository and successfully invoked `afk --help`.
+  - `git check-ignore node_modules dist` confirmed both directories are excluded from version control.
+  - `package.json` declares no runtime dependencies or workspace language, test-command or task-file requirements.
+- Learnings for future iterations:
+  - The package entrypoint currently contains only bootstrap help behavior; TASK-003 and TASK-007 own full invocation behavior.
+  - npm pack needs a temporary cache in sandboxed tests because the default npm cache is not writable.
+- Scope deviations:
+  - None.
+- Follow up needed:
+  - TASK-002 is the next ready task.
+---

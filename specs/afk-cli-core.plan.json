@@ -1,0 +1,239 @@
+{
+  "spec_path": "specs/afk-cli-core.spec.md",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "objective": "Create a TypeScript npm package whose `afk` executable can be built and run through npx-style invocation, with an automated test runner in place.",
+      "status": "completed",
+      "stories_enabled": [
+        "US-001"
+      ],
+      "acceptance_criteria_addressed": [
+        "AC-006"
+      ],
+      "completion_criteria": [
+        "A single build command compiles the TypeScript sources and a single test command runs the automated tests; both succeed on a clean checkout after dependency install.",
+        "After build, packing the package and running its `afk` bin from a directory outside the repository executes the built entrypoint (verified by an automated test or script).",
+        "Build output and dependencies are excluded from version control consistent with the existing .gitignore.",
+        "The package declares no runtime requirement on a project language, test command or task-file format for the workspace it is run in."
+      ],
+      "constraints": [
+        "Module layout follows specs/afk-cli-core.design.md (cli, protocol, session, run, main).",
+        "Do not publish the package; the package name may differ from `afk` but the exposed executable must be `afk`."
+      ],
+      "dependencies": [],
+      "verification": [
+        "npm test passed: npm run build compiled TypeScript; Node test runner passed the package integration test.",
+        "The test packed the package, installed its tarball in a temporary directory outside the repository, and ran its afk bin successfully.",
+        "git check-ignore node_modules dist confirmed both dependencies and build output are ignored.",
+        "package.json has no runtime dependencies or project-specific workspace language, test command, or task-file assumptions."
+      ]
+    },
+    {
+      "id": "TASK-002",
+      "objective": "Provide a response-protocol validator that accepts a final assistant message only when it is exactly one valid code-skill JSON response object.",
+      "status": "pending",
+      "stories_enabled": [
+        "US-002"
+      ],
+      "acceptance_criteria_addressed": [
+        "AC-010",
+        "AC-011"
+      ],
+      "completion_criteria": [
+        "Unit tests show `repeat` and `complete` objects with no extra fields are accepted, with leading/trailing whitespace tolerated.",
+        "Unit tests show `blocked` is accepted only with a non-empty string `blocker_text` and `fail` only with a non-empty string `failure_summary`, and no additional fields.",
+        "Unit tests show each of these is rejected as a violation: surrounding prose, Markdown-fenced JSON, empty input, multiple JSON values, non-object JSON, missing required fields, empty or non-string detail fields, extra fields, unknown outcomes.",
+        "The validator returns a typed result distinguishing the four outcomes and carrying the detail text for `blocked` and `fail`."
+      ],
+      "constraints": [
+        "The contract to implement is the current code skill SKILL.md referenced in the spec (AC-011); the table in the spec is authoritative if it cannot be consulted."
+      ],
+      "dependencies": [
+        "TASK-001"
+      ]
+    },
+    {
+      "id": "TASK-003",
+      "objective": "Parse and validate the command-line invocation into run options, usage output, or a clear input/option error, without launching Codex.",
+      "status": "pending",
+      "stories_enabled": [
+        "US-001",
+        "US-005",
+        "US-003"
+      ],
+      "acceptance_criteria_addressed": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-015",
+        "AC-020",
+        "AC-022",
+        "AC-024",
+        "AC-025"
+      ],
+      "completion_criteria": [
+        "A positional argument, `--prompt-file <path>` and non-empty piped stdin each yield the launch prompt when they are the only source; tests cover all three.",
+        "Multiple sources, no source, empty or whitespace-only prompt, and an unreadable prompt file each produce a distinct clear error message and an unsuccessful result; sources are never combined.",
+        "With an interactive terminal and no prompt, the result is a missing-input error and nothing is read interactively.",
+        "`--cwd <directory>` selects the workspace when it exists as a directory; otherwise an error is produced. Default is the current directory.",
+        "`--model` and `--reasoning-effort` are captured only when supplied; when absent, no override is represented.",
+        "`--max-iterations` defaults to 10 and accepts only positive integers; `--session-timeout` is absent by default and accepts only positive seconds; invalid values produce an option error. Unknown options are rejected.",
+        "`--help` and `-h` yield usage text listing the options and exit codes, taking precedence over all other option or prompt validation (including invalid values and missing prompt)."
+      ],
+      "constraints": [
+        "Pure with respect to process launching: stdin, cwd and filesystem access are injected or otherwise testable."
+      ],
+      "dependencies": [
+        "TASK-001"
+      ]
+    },
+    {
+      "id": "TASK-004",
+      "objective": "Provide a session runner that launches one fresh non-interactive Codex session in the workspace, streams its activity live, captures its final message separately, and reports a typed result.",
+      "status": "pending",
+      "stories_enabled": [
+        "US-002",
+        "US-003",
+        "US-005",
+        "US-007"
+      ],
+      "acceptance_criteria_addressed": [
+        "AC-008",
+        "AC-009",
+        "AC-013",
+        "AC-015",
+        "AC-022",
+        "AC-023",
+        "AC-027",
+        "AC-028",
+        "AC-030"
+      ],
+      "completion_criteria": [
+        "Against a fake `codex` executable, tests verify every launch uses a new non-interactive session (no resume or fork), runs in the selected workspace directory, receives the original launch prompt together with instructions to use the available code skill for one task and follow its response protocol, and explicitly selects automatic approval review.",
+        "Tests verify `--model` and `--reasoning-effort` overrides are passed to Codex only when supplied, and that without them neither is passed; no user configuration file is read or written by the harness.",
+        "Tests verify Codex output is forwarded to the terminal while the process is still running, not only after exit.",
+        "The final assistant message is obtained from Codex's dedicated last-message output and is not derived from streamed output (a fake that prints valid protocol JSON in activity but a different final message yields the final message).",
+        "Results distinguish: success with final message (including empty/missing), process launch failure, unsuccessful exit with its exit status (even if output contains valid-looking JSON), and timeout.",
+        "With a session timeout configured, a hung fake Codex is interrupted and terminated and a timeout result is returned; with none configured, no timeout applies. The timeout is per session.",
+        "When aborted via signal, the managed Codex process is terminated before the call resolves, and no Codex process is left running after the call returns in any result.",
+        "No persistent harness files remain after any result (temporary files used for the last message are removed)."
+      ],
+      "constraints": [
+        "Codex flags must be verified against the installed Codex CLI (`codex exec --help`); the prototype afk.sh shows `--approve-for-me` and `--output-last-message`. Do not add full-access or sandbox-bypass options.",
+        "Codex process launching and the filesystem must be isolated behind this module so the run policy can be tested without Codex."
+      ],
+      "dependencies": [
+        "TASK-001"
+      ]
+    },
+    {
+      "id": "TASK-005",
+      "objective": "Implement the run loop that sequences fresh sessions, applies outcome handling, the single execution-error retry and the iteration limit, and returns a final run status with the detail needed for reporting.",
+      "status": "pending",
+      "stories_enabled": [
+        "US-002",
+        "US-003",
+        "US-004",
+        "US-005",
+        "US-007"
+      ],
+      "acceptance_criteria_addressed": [
+        "AC-009",
+        "AC-011",
+        "AC-012",
+        "AC-014",
+        "AC-016",
+        "AC-017",
+        "AC-018",
+        "AC-019",
+        "AC-020",
+        "AC-021",
+        "AC-023",
+        "AC-026",
+        "AC-028",
+        "AC-029"
+      ],
+      "completion_criteria": [
+        "Using a fake session runner, tests verify sessions run strictly sequentially, each with the same original prompt, and `repeat` starts another session.",
+        "`complete` ends successfully and is the only outcome reported as feature completion; `blocked` ends unsuccessfully with the blocker text and starts no further session; `fail` surfaces the failure summary and starts a fresh session.",
+        "A launch failure, unsuccessful exit, or missing/invalid final response triggers one retry; a second consecutive execution error ends the run unsuccessfully; any valid response (including `fail`) resets the allowance. Retried sessions receive the same prompt and workspace.",
+        "Every launch attempt including retries consumes one iteration; the default limit is 10 and the configured limit is honored. On the last iteration `repeat`, `fail`, or a needed retry ends with an iteration-limit status that includes the limit, while `complete` still succeeds and `blocked` still reports the blocker.",
+        "A timeout result stops the whole run with a timeout status including the configured duration, with no retry or further iteration.",
+        "Final statuses are distinguishable for completion, blocker (with text), execution error (launch failed / exit status value / response missing or invalid), iteration limit (with limit), timeout (with duration) and interruption.",
+        "Iteration starts, retries after execution errors, execution-error reports and `fail` summaries are emitted through the reporter so a terminal output can identify them.",
+        "The loop does not read task files, Git state or run project tests (it depends only on the session runner, validator, reporter and abort signal)."
+      ],
+      "constraints": [
+        "No state persists between invocations; each run starts with a fresh budget."
+      ],
+      "dependencies": [
+        "TASK-002",
+        "TASK-004"
+      ]
+    },
+    {
+      "id": "TASK-006",
+      "objective": "Make Ctrl+C stop the run promptly: forward the interruption to the active Codex process, prevent further iterations and retries, and exit as interrupted.",
+      "status": "pending",
+      "stories_enabled": [
+        "US-006"
+      ],
+      "acceptance_criteria_addressed": [
+        "AC-025",
+        "AC-026",
+        "AC-027"
+      ],
+      "completion_criteria": [
+        "In an automated test that launches the built `afk` against a fake long-running `codex` and sends SIGINT, the Codex process receives the interruption and is no longer running when `afk` exits.",
+        "After the interrupt no further session is started and no retry occurs, even if the interrupted Codex exited unsuccessfully; the run reports interruption and exits with a non-zero code distinct from completion.",
+        "Interruption does not wait for the task to finish and does not modify or delete workspace files (verified by comparing the workspace before and after).",
+        "Starting `afk` again afterwards with the same prompt in the same workspace begins a fresh run with a full iteration budget."
+      ],
+      "constraints": [],
+      "dependencies": [
+        "TASK-004",
+        "TASK-005"
+      ]
+    },
+    {
+      "id": "TASK-007",
+      "objective": "Wire the modules into the `afk` executable so a complete invocation produces the specified terminal output and exit codes end-to-end.",
+      "status": "pending",
+      "stories_enabled": [
+        "US-001",
+        "US-003",
+        "US-004",
+        "US-005",
+        "US-007"
+      ],
+      "acceptance_criteria_addressed": [
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "AC-024",
+        "AC-025",
+        "AC-028",
+        "AC-029",
+        "AC-030"
+      ],
+      "completion_criteria": [
+        "End-to-end tests run the built `afk` against a fake `codex` executable and verify exit status 0 only for a valid `complete` outcome and non-zero for blocker, execution error, iteration limit, timeout and interruption, with a final message naming which one occurred and its required detail.",
+        "Input and option errors print a clear message to stderr, exit unsuccessfully and launch no Codex session (fake Codex records zero invocations); `--help`/`-h` prints usage, options and exit codes to stdout, exits 0 and launches nothing.",
+        "Interruption, timeout and iteration-limit exit codes are documented in `--help` output.",
+        "Running `afk` leaves no new harness-created files, directories or databases in the workspace or home directory, and does not create or switch Git branches, create worktrees, install skills or install dependencies (verified on a Git workspace fixture).",
+        "A short README documents installation prerequisites (Node.js, authenticated Codex CLI, a discoverable code skill), usage examples for the three prompt sources, options and exit codes."
+      ],
+      "constraints": [
+        "Numeric exit codes beyond success versus unsuccessful/interrupted are an implementation choice but must be consistent between code, help text and README."
+      ],
+      "dependencies": [
+        "TASK-003",
+        "TASK-005",
+        "TASK-006"
+      ]
+    }
+  ]
+}
