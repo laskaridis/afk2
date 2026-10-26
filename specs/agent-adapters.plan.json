@@ -44,7 +44,7 @@
     {
       "id": "TASK-003",
       "objective": "Report every run with agent-neutral `[afk]` status lines, including the agent's stderr tail after execution errors.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": ["US-003", "US-004"],
       "acceptance_criteria_addressed": ["AC-011", "AC-012", "AC-017", "AC-018"],
       "completion_criteria": [

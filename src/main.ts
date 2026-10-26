@@ -6,26 +6,31 @@ import { runSession } from './session.js';
 
 function describeError(error: ExecutionError): string {
   switch (error.kind) {
-    case 'launch-failed': return `Codex launch failed: ${error.message}`;
-    case 'exit-failed': return `Codex exited unsuccessfully with status ${error.status ?? 'unknown'}`;
-    case 'missing-response': return 'final response is missing';
-    case 'invalid-response': return 'final response is invalid';
+    case 'launch-failed': return `failed to launch agent: ${error.message}`;
+    case 'exit-failed': return error.status === null ? 'agent exited unsuccessfully with signal' : `agent exited unsuccessfully with exit code ${error.status}`;
+    case 'missing-response': return 'agent exited without a final response';
+    case 'invalid-response': return `agent final response is invalid: ${error.reason}`;
   }
+}
+
+function reportExecutionError(error: ExecutionError, stderrTail: string[]): void {
+  process.stderr.write(`[afk] Execution error: ${describeError(error)}\n`);
+  for (const line of stderrTail) process.stderr.write(`${line}\n`);
 }
 
 function report(event: RunEvent): void {
   switch (event.kind) {
     case 'iteration-start':
-      process.stderr.write(`afk: starting iteration ${event.iteration}/${event.limit}\n`);
+      process.stderr.write(`[afk] Iteration ${event.iteration}/${event.limit}: starting agent session\n`);
       break;
     case 'execution-error':
-      process.stderr.write(`afk: execution error: ${describeError(event.error)}\n`);
+      reportExecutionError(event.error, event.stderrTail);
       break;
     case 'retry':
-      process.stderr.write(`afk: retrying with fresh session ${event.iteration}\n`);
+      process.stderr.write(`[afk] Retrying with fresh session ${event.iteration}\n`);
       break;
     case 'fail':
-      process.stderr.write(`afk: task failed: ${event.summary}\n`);
+      process.stderr.write(`[afk] Task failed: ${event.summary}\n`);
       break;
   }
 }
@@ -58,7 +63,7 @@ if (invocation.kind !== 'help' && !process.stdin.isTTY) {
 if (invocation.kind === 'help') {
   process.stdout.write(invocation.text);
 } else if (invocation.kind === 'error') {
-  process.stderr.write(`afk: ${invocation.message}\n`);
+  process.stderr.write(`[afk] ${invocation.message}\n`);
   process.exitCode = invocation.category === 'option' ? 2 : 1;
 } else {
   const controller = new AbortController();
@@ -72,16 +77,16 @@ if (invocation.kind === 'help') {
   try {
     const status = await runLoop(invocation.options, runSession, report, controller.signal);
     if (status.kind === 'interrupted') {
-      process.stderr.write(received === 'SIGTERM' || received === 'SIGHUP' ? `afk: interrupted by ${received}\n` : 'afk: interrupted by Ctrl+C\n');
+      process.stderr.write(received === 'SIGTERM' || received === 'SIGHUP' ? `[afk] Interrupted by ${received}\n` : '[afk] Interrupted by Ctrl+C\n');
       process.exitCode = received === 'SIGTERM' ? 143 : received === 'SIGHUP' ? 129 : 130;
     } else if (status.kind === 'completed') {
-      process.stdout.write('afk: feature completed\n');
+      process.stderr.write('[afk] Feature completed\n');
     } else {
       switch (status.kind) {
-        case 'blocked': process.stderr.write(`afk: blocked: ${status.blockerText}\n`); break;
-        case 'execution-error': process.stderr.write(`afk: execution error: ${describeError(status.error)}\n`); break;
-        case 'iteration-limit': process.stderr.write(`afk: iteration limit reached (${status.limit}) without reported completion\n`); break;
-        case 'timeout': process.stderr.write(`afk: session timeout after ${status.duration} seconds\n`); break;
+        case 'blocked': process.stderr.write(`[afk] Run blocked: ${status.blockerText}\n`); break;
+        case 'execution-error': reportExecutionError(status.error, status.stderrTail); break;
+        case 'iteration-limit': process.stderr.write(`[afk] Iteration limit reached (${status.limit}) without reported completion\n`); break;
+        case 'timeout': process.stderr.write(`[afk] agent session timed out after ${status.duration} seconds\n`); break;
       }
       process.exitCode = status.kind === 'timeout' ? 2 : 1;
     }

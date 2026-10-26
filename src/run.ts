@@ -7,19 +7,19 @@ export type ExecutionError =
   | { kind: 'launch-failed'; message: string }
   | { kind: 'exit-failed'; status: number | null }
   | { kind: 'missing-response' }
-  | { kind: 'invalid-response' };
+  | { kind: 'invalid-response'; reason: string };
 
 export type RunStatus =
   | { kind: 'completed' }
   | { kind: 'blocked'; blockerText: string }
-  | { kind: 'execution-error'; error: ExecutionError }
+  | { kind: 'execution-error'; error: ExecutionError; stderrTail: string[] }
   | { kind: 'iteration-limit'; limit: number }
   | { kind: 'timeout'; duration: number }
   | { kind: 'interrupted' };
 
 export type RunEvent =
   | { kind: 'iteration-start'; iteration: number; limit: number }
-  | { kind: 'execution-error'; error: ExecutionError }
+  | { kind: 'execution-error'; error: ExecutionError; stderrTail: string[] }
   | { kind: 'retry'; iteration: number }
   | { kind: 'fail'; summary: string };
 
@@ -49,11 +49,13 @@ export async function runLoop(options: RunOptions, runSession: SessionRunner, re
     if (result.kind === 'launch-failed') error = { kind: 'launch-failed', message: result.message };
     else if (result.kind === 'exit-failed') error = { kind: 'exit-failed', status: result.status };
     else if (result.kind === 'missing-response') error = { kind: 'missing-response' };
-    else if (result.kind === 'invalid-response') error = { kind: 'invalid-response' };
+    else if (result.kind === 'invalid-response') error = { kind: 'invalid-response', reason: result.reason };
     else {
       const response = parseResponse(result.finalMessage);
       if ('kind' in response) {
-        error = { kind: result.finalMessage.trim() ? 'invalid-response' : 'missing-response' };
+        error = result.finalMessage.trim()
+          ? { kind: 'invalid-response', reason: 'code skill protocol violation' }
+          : { kind: 'missing-response' };
       } else {
         consecutiveErrors = 0;
         if (response.outcome === 'complete') return { kind: 'completed' };
@@ -63,9 +65,9 @@ export async function runLoop(options: RunOptions, runSession: SessionRunner, re
       }
     }
 
-    report({ kind: 'execution-error', error });
     consecutiveErrors++;
-    if (consecutiveErrors >= 2) return { kind: 'execution-error', error };
+    if (consecutiveErrors >= 2) return { kind: 'execution-error', error, stderrTail: result.stderrTail ?? [] };
+    report({ kind: 'execution-error', error, stderrTail: result.stderrTail ?? [] });
     if (iteration < options.maxIterations) report({ kind: 'retry', iteration: iteration + 1 });
   }
   return { kind: 'iteration-limit', limit: options.maxIterations };

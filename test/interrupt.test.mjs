@@ -45,6 +45,7 @@ if (process.env.AFK_FINISH === 'yes') {
   process.stdout.write(count === 2 ? '{"outcome":"repeat"}' : '{"outcome":"complete"}');
   process.exit(0);
 }
+process.stderr.write('interrupted agent detail\\n');
 process.on('SIGINT', () => {
   fs.writeFileSync(process.env.AFK_SIGNAL, 'SIGINT');
   process.exit(7);
@@ -66,6 +67,7 @@ setInterval(() => {}, 1000);
     assert.ok(Date.now() - interruptedAt < 3000, 'interruption should not wait for the fake task');
     assert.equal(result.code, 130, result.output);
     assert.match(result.output, /interrupt/i);
+    assert.doesNotMatch(result.output, /interrupted agent detail/);
     assert.equal(readFileSync(signal, 'utf8'), 'SIGINT');
     assert.throws(() => process.kill(codexPid, 0), /ESRCH/);
     assert.equal(readFileSync(count, 'utf8'), '1');

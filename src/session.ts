@@ -89,7 +89,7 @@ export async function runSession(config: SessionConfig, signal: AbortSignal): Pr
         stderrTail.push(stderrRemainder.replace(/\r$/, ''));
         if (stderrTail.length > 20) stderrTail.shift();
       }
-      if (launchError) return resolve({ kind: 'launch-failed', message: launchError.message, stderrTail });
+      if (launchError) return resolve({ kind: 'launch-failed', message: (launchError as NodeJS.ErrnoException).code ?? 'unknown error', stderrTail });
       if (status !== 0) return resolve({ kind: 'exit-failed', status, stderrTail });
       const final = adapter.extractFinalMessage(Buffer.concat(stdout).toString('utf8'));
       if (final.kind === 'missing') return resolve({ kind: 'missing-response', stderrTail });

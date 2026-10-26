@@ -2,6 +2,7 @@
 - `npm test` builds TypeScript and runs the full Node test suite; fake agent executables are placed on PATH by session and CLI tests.
 - The existing CLI flag is `--reasoning-effort`; Codex receives it through `-c model_reasoning_effort=<JSON string>`.
 - The built-in adapter registry is `src/agents/registry.ts`; CLI validation and the run loop both read it, and the session runner requires an adapter.
+- Run status rendering is in `src/main.ts`; execution-error events and terminal status carry the session's `stderrTail` through `src/run.ts`.
 ---
 
 ## 2026-10-26 14:47:28 UTC
@@ -77,4 +78,36 @@
 - Scope deviations:
   - None.
 - Follow up needed: TASK-003 agent-neutral status lines and stderr reporting remain pending.
+---
+
+## 2026-10-26 14:56:55 UTC
+- Task id: TASK-003
+- What was implemented:
+  - Changed run status lines and final statuses to agent-neutral `[afk]` wording on stderr, including successful completion.
+  - Carried stderr tails and invalid-response reasons through execution-error events and final status; each error prints once with its own last 20 stderr lines directly afterward.
+  - Made launch failure reporting use the operating-system error code so the message does not name the selected executable.
+- Files changed:
+  - src/main.ts
+  - src/run.ts
+  - src/session.ts
+  - test/main.test.mjs
+  - test/run.test.mjs
+  - test/interrupt.test.mjs
+  - specs/agent-adapters.plan.json
+  - progress.txt
+- Verification:
+  - RED: `node --test test/main.test.mjs` failed on old status wording, completion stdout, and missing stderr tails.
+  - GREEN: `node --test test/main.test.mjs test/run.test.mjs` passed 22 tests after the reporting changes.
+  - `npm test` passed 47 tests, 0 failures, including interruption and package tests.
+  - AC-011: CLI tests verify the exact iteration-start and execution-error prefixes, neutral launch/exit/missing/invalid wording, and exit codes 0, 1, and 2; interruption test verifies exit 130. Source inspection confirms all run status lines use `[afk]` and no agent-specific wording.
+  - AC-012: a CLI test registers a second adapter and confirms identical stderr, stdout, and exit code for the same exit-then-blocked session sequence; a run-loop test confirms identical events and final status.
+  - AC-017: CLI fixture emits 25 stderr lines; the test verifies only lines 6-25 print after each of two execution errors, once per error and in order. Run-loop test verifies each error carries its own tail.
+  - AC-018: CLI tests verify agent stderr stays hidden on valid responses and timeout; interruption test emits stderr and verifies it stays hidden. Run-loop tests verify these statuses expose no stderr tail.
+  - Read-only implementation review found no concrete TASK-003 completion blockers.
+- Learnings for future iterations:
+  - TASK-004 can supply adapter-specific invalid-response reasons through `SessionResult.invalid-response.reason` without changing the reporter.
+  - Terminal execution errors are reported by final status, while retryable errors are reported as events, avoiding duplicate lines.
+- Scope deviations:
+  - `src/session.ts` now reports the launch error code instead of Node's raw message because that message includes the executable name and violates agent-neutral wording.
+- Follow up needed: TASK-004 Claude adapter and error classification remain pending.
 ---

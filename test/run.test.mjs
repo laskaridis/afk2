@@ -54,7 +54,7 @@ test('each execution-error type retries once with the same prompt and workspace'
     [{ kind: 'launch-failed', message: 'ENOENT' }, { kind: 'launch-failed', message: 'ENOENT' }],
     [{ kind: 'exit-failed', status: 7 }, { kind: 'exit-failed', status: 7 }],
     [{ kind: 'ok', finalMessage: '' }, { kind: 'missing-response' }],
-    [{ kind: 'ok', finalMessage: 'not JSON' }, { kind: 'invalid-response' }],
+    [{ kind: 'ok', finalMessage: 'not JSON' }, { kind: 'invalid-response', reason: 'code skill protocol violation' }],
   ];
   for (const [first, expectedError] of errors) {
     const calls = [];
@@ -69,7 +69,7 @@ test('each execution-error type retries once with the same prompt and workspace'
     assert.deepEqual(calls[0], {
       adapter: codex, prompt: 'Original prompt', cwd: '/prepared/workspace', model: 'chosen', reasoningEffort: 'high', sessionTimeout: 4,
     });
-    assert.deepEqual(events.filter(event => event.kind === 'execution-error'), [{ kind: 'execution-error', error: expectedError }]);
+    assert.deepEqual(events.filter(event => event.kind === 'execution-error'), [{ kind: 'execution-error', error: expectedError, stderrTail: [] }]);
     assert.deepEqual(events.filter(event => event.kind === 'retry'), [{ kind: 'retry', iteration: 2 }]);
   }
 });
@@ -79,7 +79,7 @@ test('two consecutive execution errors stop, while a valid repeat or fail resets
   const second = { kind: 'exit-failed', status: 7 };
   let calls = 0;
   assert.deepEqual(await runLoop(options(), async () => { calls++; return calls === 1 ? first : second; }, () => {}, new AbortController().signal),
-    { kind: 'execution-error', error: second });
+    { kind: 'execution-error', error: second, stderrTail: [] });
   assert.equal(calls, 2);
 
   for (const valid of [{ outcome: 'repeat' }, { outcome: 'fail', failure_summary: 'Found a defect' }]) {
@@ -157,4 +157,45 @@ test('every launch and retry uses the selected adapter and preserves overrides',
       }
     }
   } finally { adapters.delete(stub.name); }
+});
+
+test('execution error events and final status carry only their own stderr tails and invalid reasons', async () => {
+  const first = { kind: 'invalid-response', reason: 'agent output could not be parsed', stderrTail: ['first detail'] };
+  const second = { kind: 'ok', finalMessage: 'not JSON', stderrTail: ['second detail'] };
+  const results = [first, second];
+  const events = [];
+  const status = await runLoop(options(), async () => results.shift(), event => events.push(event), new AbortController().signal);
+  assert.deepEqual(events.filter(event => event.kind === 'execution-error'), [{
+    kind: 'execution-error', error: { kind: 'invalid-response', reason: first.reason }, stderrTail: ['first detail'],
+  }]);
+  assert.deepEqual(status, {
+    kind: 'execution-error', error: { kind: 'invalid-response', reason: 'code skill protocol violation' }, stderrTail: ['second detail'],
+  });
+});
+
+test('successful protocol responses and timeouts never expose agent stderr', async () => {
+  for (const result of [
+    { ...ok({ outcome: 'complete' }), stderrTail: ['private success detail'] },
+    { kind: 'timed-out' },
+  ]) {
+    const events = [];
+    const status = await runLoop(options(), async () => result, event => events.push(event), new AbortController().signal);
+    assert.equal(events.some(event => event.kind === 'execution-error'), false);
+    assert.equal('stderrTail' in status, false);
+  }
+});
+
+test('the same results produce the same events and status for different adapters', async () => {
+  const other = { name: 'other', executable: 'other', buildArgs: () => [], extractFinalMessage: () => ({ kind: 'missing' }) };
+  adapters.set(other.name, other);
+  try {
+    const outputs = [];
+    for (const agent of ['codex', 'other']) {
+      const results = [{ kind: 'exit-failed', status: 3, stderrTail: ['detail'] }, ok({ outcome: 'blocked', blocker_text: 'needs work' })];
+      const events = [];
+      const status = await runLoop(options({ agent }), async () => results.shift(), event => events.push(event), new AbortController().signal);
+      outputs.push({ events, status });
+    }
+    assert.deepEqual(outputs[0], outputs[1]);
+  } finally { adapters.delete(other.name); }
 });
