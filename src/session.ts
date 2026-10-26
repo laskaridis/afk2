@@ -1,10 +1,9 @@
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { codex } from './agents/codex.js';
 import type { AgentAdapter } from './agents/types.js';
 
 export interface SessionConfig {
-  adapter?: AgentAdapter;
+  adapter: AgentAdapter;
   prompt: string;
   cwd: string;
   model?: string;
@@ -26,7 +25,7 @@ const skillInstructions = 'Use the available code skill for this iteration. Impl
 /** Run one new agent conversation, leaving all run policy to the caller. */
 export async function runSession(config: SessionConfig, signal: AbortSignal): Promise<SessionResult> {
   if (signal.aborted) return { kind: 'aborted' };
-  const adapter = config.adapter ?? codex;
+  const adapter = config.adapter;
   const args = adapter.buildArgs({ cwd: config.cwd, model: config.model, effort: config.reasoningEffort });
 
   return await new Promise<SessionResult>((resolve) => {

@@ -1,11 +1,13 @@
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { adapters, supportedAgentNames } from './agents/registry.js';
 
 export interface RunOptions {
   prompt: string;
   cwd: string;
   maxIterations: number;
   sessionTimeout?: number;
+  agent?: string;
   model?: string;
   reasoningEffort?: string;
 }
@@ -56,6 +58,8 @@ export function parseInvocation(argv: string[], stdin: string | null, cwd: strin
   let reasoningEffort: string | undefined;
   let maxIterations = 10;
   let sessionTimeout: number | undefined;
+  let agent: string | undefined;
+  const agentError = () => optionError(`--agent requires a supported name: ${supportedAgentNames().join(', ')}.`);
 
   for (let index = 0; index < argv.length; index++) {
     const argument = argv[index];
@@ -64,12 +68,13 @@ export function parseInvocation(argv: string[], stdin: string | null, cwd: strin
       positional = argument;
       continue;
     }
-    if (!['--prompt-file', '--cwd', '--model', '--reasoning-effort', '--max-iterations', '--session-timeout'].includes(argument)) {
+    if (argument.startsWith('--agent=')) return agentError();
+    if (!['--prompt-file', '--cwd', '--model', '--reasoning-effort', '--max-iterations', '--session-timeout', '--agent'].includes(argument)) {
       return optionError(`Unknown option: ${argument}`);
     }
     const value = argv[++index];
     if (value === undefined || value === '' || value.startsWith('--')) {
-      return optionError(`${argument} requires a value.`);
+      return argument === '--agent' ? agentError() : optionError(`${argument} requires a value.`);
     }
     switch (argument) {
       case '--prompt-file':
@@ -79,6 +84,10 @@ export function parseInvocation(argv: string[], stdin: string | null, cwd: strin
       case '--cwd': workspace = resolve(cwd, value); break;
       case '--model': model = value; break;
       case '--reasoning-effort': reasoningEffort = value; break;
+      case '--agent':
+        if (!adapters.has(value)) return agentError();
+        agent = value;
+        break;
       case '--max-iterations': {
         const count = Number(value);
         if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(count)) {
@@ -128,6 +137,7 @@ export function parseInvocation(argv: string[], stdin: string | null, cwd: strin
       ...(sessionTimeout !== undefined && { sessionTimeout }),
       ...(model !== undefined && { model }),
       ...(reasoningEffort !== undefined && { reasoningEffort }),
+      ...(agent !== undefined && { agent }),
     },
   };
 }

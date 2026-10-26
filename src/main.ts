@@ -59,7 +59,7 @@ if (invocation.kind === 'help') {
   process.stdout.write(invocation.text);
 } else if (invocation.kind === 'error') {
   process.stderr.write(`afk: ${invocation.message}\n`);
-  process.exitCode = 1;
+  process.exitCode = invocation.category === 'option' ? 2 : 1;
 } else {
   const controller = new AbortController();
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runLoop } from '../dist/run.js';
+import { codex } from '../dist/agents/codex.js';
+import { adapters } from '../dist/agents/registry.js';
 
 const options = (extra = {}) => ({
   prompt: 'Original prompt', cwd: '/prepared/workspace', maxIterations: 10, ...extra,
@@ -25,8 +27,8 @@ test('repeat starts fresh sequential sessions with the original options', async 
 
   assert.deepEqual(status, { kind: 'completed' });
   assert.deepEqual(calls, [
-    { prompt: 'Original prompt', cwd: '/prepared/workspace' },
-    { prompt: 'Original prompt', cwd: '/prepared/workspace' },
+    { adapter: codex, prompt: 'Original prompt', cwd: '/prepared/workspace' },
+    { adapter: codex, prompt: 'Original prompt', cwd: '/prepared/workspace' },
   ]);
   assert.deepEqual(events.filter(event => event.kind === 'iteration-start').map(event => event.iteration), [1, 2]);
 });
@@ -65,7 +67,7 @@ test('each execution-error type retries once with the same prompt and workspace'
     assert.equal(calls.length, 2);
     assert.deepEqual(calls[0], calls[1]);
     assert.deepEqual(calls[0], {
-      prompt: 'Original prompt', cwd: '/prepared/workspace', model: 'chosen', reasoningEffort: 'high', sessionTimeout: 4,
+      adapter: codex, prompt: 'Original prompt', cwd: '/prepared/workspace', model: 'chosen', reasoningEffort: 'high', sessionTimeout: 4,
     });
     assert.deepEqual(events.filter(event => event.kind === 'execution-error'), [{ kind: 'execution-error', error: expectedError }]);
     assert.deepEqual(events.filter(event => event.kind === 'retry'), [{ kind: 'retry', iteration: 2 }]);
@@ -135,4 +137,24 @@ test('interruption during iteration reporting prevents the session launch', asyn
     () => controller.abort(), controller.signal);
   assert.deepEqual(result, { kind: 'interrupted' });
   assert.equal(calls, 0);
+});
+
+test('every launch and retry uses the selected adapter and preserves overrides', async () => {
+  const stub = { name: 'stub', executable: 'stub', buildArgs: () => [], extractFinalMessage: () => ({ kind: 'missing' }) };
+  adapters.set(stub.name, stub);
+  try {
+    for (const [agent, expected] of [[undefined, codex], ['codex', codex], ['stub', stub]]) {
+      const calls = [];
+      const responses = [{ kind: 'launch-failed', message: 'ENOENT' }, ok({ outcome: 'complete' })];
+      const status = await runLoop(options({ ...(agent && { agent }), model: 'unmapped-model', reasoningEffort: 'custom-effort' }),
+        async config => { calls.push(config); return responses.shift(); }, () => {}, new AbortController().signal);
+      assert.deepEqual(status, { kind: 'completed' });
+      assert.equal(calls.length, 2);
+      for (const call of calls) {
+        assert.equal(call.adapter, expected);
+        assert.equal(call.model, 'unmapped-model');
+        assert.equal(call.reasoningEffort, 'custom-effort');
+      }
+    }
+  } finally { adapters.delete(stub.name); }
 });

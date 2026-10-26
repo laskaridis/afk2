@@ -82,6 +82,25 @@ test('input and option errors and help never launch Codex', () => fixture(({ inv
   assert.equal(readdirSync(join(invocations, '..')).includes('invocations'), false);
 }));
 
+test('invalid agent names exit with usage code and launch no session', () => fixture(({ invocations, launch }) => {
+  for (const args of [['--agent', 'unknown', 'prompt'], ['--agent', '', 'prompt'], ['--agent=', 'prompt'], ['--agent']]) {
+    const result = launch(args);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /codex/);
+    assert.equal(result.stdout, '');
+    assert.equal(readdirSync(join(invocations, '..')).includes('invocations'), false);
+  }
+}));
+
+test('explicit Codex selection and retries keep the selected adapter and raw settings', () => fixture(({ root, launch, invocations }) => {
+  const result = launch(['--agent', 'codex', '--model', 'custom-model', '--reasoning-effort', 'custom-effort', '--max-iterations', '2', 'prompt'],
+    { env: { AFK_OUTCOMES: '["exit","complete"]' } });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(invocations, 'utf8'), '2');
+  const call = JSON.parse(readFileSync(join(root, 'args'), 'utf8'));
+  assert.deepEqual(call.args, ['exec', '--approve-for-me', '--model', 'custom-model', '-c', 'model_reasoning_effort="custom-effort"', '-']);
+}));
+
 test('all final outcomes report a clear status and consistent exit code', () => fixture(({ launch }) => {
   const cases = [
     ['complete', 0, 1, /feature completed/i],

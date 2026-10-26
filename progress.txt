@@ -1,6 +1,7 @@
 ## Project discovery
 - `npm test` builds TypeScript and runs the full Node test suite; fake agent executables are placed on PATH by session and CLI tests.
 - The existing CLI flag is `--reasoning-effort`; Codex receives it through `-c model_reasoning_effort=<JSON string>`.
+- The built-in adapter registry is `src/agents/registry.ts`; CLI validation and the run loop both read it, and the session runner requires an adapter.
 ---
 
 ## 2026-10-26 14:47:28 UTC
@@ -41,4 +42,39 @@
   - `src/run.ts` needed two result-kind mappings because missing and invalid extraction now come from the session runner.
   - Existing CLI and interruption fixtures were updated to emit the final message on stdout, matching the new Codex contract.
 - Follow up needed: TASK-002 registry and agent selection remain pending.
+---
+
+## 2026-10-26 14:52:14 UTC
+- Task id: TASK-002
+- What was implemented:
+  - Added the built-in adapter registry with Codex as the default and a supported-name list derived from registered adapters.
+  - Added `--agent` validation and selection; option errors now exit 2 while prompt input errors retain exit 1.
+  - Passed the selected adapter and raw model/effort overrides to every session, including retries; removed the Codex fallback from the shared session runner.
+- Files changed:
+  - src/agents/registry.ts
+  - src/cli.ts
+  - src/main.ts
+  - src/run.ts
+  - src/session.ts
+  - test/agents-registry.test.mjs
+  - test/cli.test.mjs
+  - test/main.test.mjs
+  - test/run.test.mjs
+  - specs/agent-adapters.plan.json
+  - progress.txt
+- Verification:
+  - RED: `node --test test/agents-registry.test.mjs test/cli.test.mjs test/run.test.mjs` failed because the registry module did not exist.
+  - GREEN: the new registry, parser and run-loop tests passed in the full suite after adding the registry and updating run-loop config assertions.
+  - `npm test` passed after the final refactor: 42 tests, 0 failures.
+  - Default and explicit Codex selection: run-loop tests verify each session and retry receives the Codex adapter; CLI fake executable verifies an explicit Codex retry completes after two launches.
+  - Unsupported and empty `--agent`: parser tests verify option errors list names from the registry, including a temporary stub; CLI tests verify exit 2 and no session launch.
+  - Registry extensibility: adding a stub only to the registry makes it selectable in parser and run-loop tests, and the error list includes its name.
+  - Overrides: parser and run-loop tests verify model and reasoning effort pass unchanged; default run-loop config verifies absent overrides are omitted.
+  - Read-only review identified a duplicate Codex default inside the session runner; removed it and reran the full suite.
+- Learnings for future iterations:
+  - TASK-004 can register Claude by adding its adapter to the registry; `--agent` validation and run-loop selection need no changes.
+  - TASK-006 still owns help and README text listing supported agents.
+- Scope deviations:
+  - None.
+- Follow up needed: TASK-003 agent-neutral status lines and stderr reporting remain pending.
 ---

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { parseInvocation } from '../dist/cli.js';
+import { adapters } from '../dist/agents/registry.js';
 
 function withDirectory(run) {
   const cwd = mkdtempSync(join(tmpdir(), 'afk-cli-'));
@@ -91,4 +92,33 @@ test('help takes precedence and describes options and exit codes', () => withDir
       assert.match(result.text, new RegExp(item));
     }
   }
+}));
+
+test('selects a registered agent and rejects empty or unsupported names', () => withDirectory((cwd) => {
+  const stub = { name: 'stub', executable: 'stub', buildArgs: () => [], extractFinalMessage: () => ({ kind: 'missing' }) };
+  adapters.set(stub.name, stub);
+  try {
+    const selected = parseInvocation(['--agent', 'stub', 'task'], null, cwd);
+    assert.equal(selected.kind, 'options');
+    assert.equal(selected.options.agent, 'stub');
+    for (const argv of [['--agent', 'absent', 'task'], ['--agent', '', 'task'], ['--agent'], ['--agent=', 'task']]) {
+      const result = parseInvocation(argv, null, cwd);
+      assert.equal(result.kind, 'error');
+      assert.equal(result.category, 'option');
+      assert.match(result.message, /codex/);
+      assert.match(result.message, /stub/);
+    }
+  } finally { adapters.delete(stub.name); }
+}));
+
+test('passes model and reasoning effort unchanged and omits absent overrides', () => withDirectory((cwd) => {
+  const selected = parseInvocation(['--agent', 'codex', '--model', 'unmapped-model', '--reasoning-effort', 'custom-effort', 'task'], null, cwd);
+  assert.equal(selected.kind, 'options');
+  assert.equal(selected.options.model, 'unmapped-model');
+  assert.equal(selected.options.reasoningEffort, 'custom-effort');
+  const defaults = parseInvocation(['task'], null, cwd);
+  assert.equal(defaults.kind, 'options');
+  assert.equal(defaults.options.agent, undefined);
+  assert.equal(Object.hasOwn(defaults.options, 'model'), false);
+  assert.equal(Object.hasOwn(defaults.options, 'reasoningEffort'), false);
 }));

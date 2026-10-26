@@ -25,7 +25,7 @@
     {
       "id": "TASK-002",
       "objective": "Provide a registry of built-in adapters and an --agent option that selects the agent for every session of a run, defaulting to Codex.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": ["US-001", "US-005"],
       "acceptance_criteria_addressed": ["AC-001", "AC-002", "AC-003", "AC-005", "AC-022"],
       "completion_criteria": [

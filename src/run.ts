@@ -1,6 +1,7 @@
 import type { RunOptions } from './cli.js';
 import { parseResponse } from './protocol.js';
 import type { SessionConfig, SessionResult } from './session.js';
+import { adapters, defaultAgentName } from './agents/registry.js';
 
 export type ExecutionError =
   | { kind: 'launch-failed'; message: string }
@@ -28,6 +29,7 @@ export type Reporter = (event: RunEvent) => void;
 /** Apply the code-skill outcome policy without inspecting project state. */
 export async function runLoop(options: RunOptions, runSession: SessionRunner, report: Reporter, signal: AbortSignal): Promise<RunStatus> {
   const config: SessionConfig = {
+    adapter: adapters.get(options.agent ?? defaultAgentName)!,
     prompt: options.prompt,
     cwd: options.cwd,
     ...(options.model !== undefined && { model: options.model }),
