@@ -143,7 +143,7 @@
     {
       "id": "TASK-005",
       "objective": "Implement the run loop that sequences fresh sessions, applies outcome handling, the single execution-error retry and the iteration limit, and returns a final run status with the detail needed for reporting.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": [
         "US-002",
         "US-003",
@@ -183,6 +183,13 @@
       "dependencies": [
         "TASK-002",
         "TASK-004"
+      ],
+      "verification": [
+        "RED: npm run build && node --test test/run.test.mjs failed because dist/run.js was absent; GREEN: the same command passed the initial sequential-session test.",
+        "Eight run-loop tests cover sequential sessions, original prompt/workspace/options, all protocol outcomes, error types and single retry, allowance reset after repeat/fail, budget and final-iteration precedence, timeout, interruption, and reporter events.",
+        "An independent read-only review found an abort-during-reporting edge; its added test failed before the signal check and passed after it.",
+        "npm test passed all 25 tests after a prior broad-run failure in the existing timing-sensitive session timeout test; no run-loop change was needed for that test.",
+        "Run loop uses only injected session runner and reporter, parseResponse, options and abort signal; it does not inspect task files, Git state or project tests."
       ]
     },
     {

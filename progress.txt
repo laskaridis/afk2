@@ -80,3 +80,27 @@
 - Follow up needed:
   - TASK-005 is the next ready task.
 ---
+
+## 2026-10-26 13:08:25 UTC
+- Task id: TASK-005
+- What was implemented:
+  - Added the run loop with sequential fresh sessions, protocol outcome handling, one consecutive execution-error retry, iteration budget, timeout and interruption statuses, and reporter events.
+  - Added run-loop tests using an injected fake session runner and the real response validator.
+- Files changed:
+  - src/run.ts
+  - test/run.test.mjs
+  - specs/afk-cli-core.plan.json
+  - progress.txt
+- Verification:
+  - Scenarios: sequential repeat with original options; complete, blocked and fail; launch, exit, missing-response and invalid-response errors; retry and reset after repeat/fail; last-iteration precedence; timeout; interruption before and during a session; reporter events.
+  - RED: `npm run build && node --test test/run.test.mjs` failed because `dist/run.js` was absent. GREEN: the same command passed after adding the run loop.
+  - Independent review found that abort during `iteration-start` reporting could still launch a session. Added a failing test, then a signal check; the focused command passed all 8 tests.
+  - `npm test` passed all 25 tests. One earlier full-suite run failed in the existing timing-sensitive session timeout test when its fake process did not write a signal marker before timeout; a rerun passed without changing that test.
+  - Each completion criterion was checked against the run-loop tests, typed statuses and reporter events. The loop does not read task files, Git state or project tests.
+- Learnings for future iterations:
+  - `runLoop(options, runSession, report, signal)` reports typed iteration-start, execution-error, retry and fail events; `RunStatus` carries final outcome details for the main entrypoint.
+- Scope deviations:
+  - None.
+- Follow up needed:
+  - TASK-006 is the next ready task.
+---
