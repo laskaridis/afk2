@@ -104,3 +104,27 @@
 - Follow up needed:
   - TASK-006 is the next ready task.
 ---
+
+## 2026-10-26 13:20:00 UTC
+- Task id: TASK-006
+- What was implemented:
+  - Wired the executable's SIGINT handler to an AbortController so the run loop interrupts the active Codex session and exits 130.
+  - Added a built-CLI fake-Codex integration test for interruption and fresh invocation state.
+- Files changed:
+  - src/main.ts
+  - test/interrupt.test.mjs
+  - specs/afk-cli-core.plan.json
+  - progress.txt
+- Verification:
+  - Scenarios: active fake Codex receives SIGINT and exits nonzero; no retry or next session; child gone before harness exit; bounded interruption time; untouched workspace; same prompt/workspace rerun gets a full two-session budget.
+  - RED: `npm run build && node --test test/interrupt.test.mjs` failed waiting for fake Codex because the executable did not launch it.
+  - GREEN: the focused command passed after adding minimal main wiring, and passed again after fixing the fake's readiness race.
+  - `npm test` passed all 26 tests. An independent read-only review found the test race, which was fixed before sign-off.
+  - TASK-006 criteria were checked against the integration assertions: signal forwarding, no retry, interrupted status and code, prompt/workspace preservation, and fresh budget.
+- Learnings for future iterations:
+  - `main.ts` currently handles only positional prompts and minimal result reporting; TASK-007 must add stdin handling and full event/status output.
+- Scope deviations:
+  - None.
+- Follow up needed:
+  - TASK-007 is the next ready task.
+---

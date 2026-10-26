@@ -195,7 +195,7 @@
     {
       "id": "TASK-006",
       "objective": "Make Ctrl+C stop the run promptly: forward the interruption to the active Codex process, prevent further iterations and retries, and exit as interrupted.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": [
         "US-006"
       ],
@@ -214,6 +214,12 @@
       "dependencies": [
         "TASK-004",
         "TASK-005"
+      ],
+      "verification": [
+        "RED: npm run build && node --test test/interrupt.test.mjs failed because the built CLI never launched Codex; GREEN: the same command passed after minimal signal wiring.",
+        "The built CLI test verified SIGINT reached fake Codex, the fake exited nonzero, no retry started, child PID was gone before afk exited, and afk reported interruption with exit code 130 within the bounded time.",
+        "The fixture workspace retained its original file and contents; rerunning the same prompt and workspace with a two-session limit completed after repeat then complete, proving a fresh budget.",
+        "npm test passed all 26 tests. Independent read-only review found a readiness race in the fake; handler registration was moved before its readiness marker and the focused test passed again."
       ]
     },
     {
