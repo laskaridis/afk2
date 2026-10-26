@@ -56,7 +56,7 @@
     {
       "id": "TASK-003",
       "objective": "Parse and validate the command-line invocation into run options, usage output, or a clear input/option error, without launching Codex.",
-      "status": "pending",
+      "status": "completed",
       "stories_enabled": [
         "US-001",
         "US-005",
@@ -88,6 +88,11 @@
       ],
       "dependencies": [
         "TASK-001"
+      ],
+      "verification": [
+        "RED: npm run build && node --test test/cli.test.mjs failed because dist/cli.js did not exist; GREEN: the same command passed all five invocation tests.",
+        "Tests cover positional, prompt-file and piped stdin prompts; multiple, missing, empty and unreadable sources; default and selected workspace directories; supplied versus absent overrides; invalid numeric values, missing values and unknown options; and help precedence with options and exit codes.",
+        "parseInvocation returns typed options, help or categorized error values and does not launch Codex. npm test passed all 10 tests including package integration."
       ]
     },
     {
