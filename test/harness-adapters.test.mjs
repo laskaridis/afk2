@@ -78,7 +78,7 @@ for (const adapter of adapters.values()) {
     assert.equal(readFileSync(env.AFK_COUNT, 'utf8'), '2');
     assert.deepEqual(recovered.stderr.trimEnd().split('\n'), [
       '[afk] Iteration 1/3: starting agent session',
-      '[afk] Execution error: agent final response is invalid: code skill protocol violation',
+      '[afk] Execution error: agent final response is invalid: protocol violation',
       '[afk] Retrying with fresh session 2',
       '[afk] Iteration 2/3: starting agent session',
       '[afk] Feature completed',

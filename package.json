@@ -14,7 +14,7 @@
     "dist/"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp src/harness.md dist/harness.md",
     "test": "npm run build && node --test --test-concurrency=1"
   },
   "devDependencies": {

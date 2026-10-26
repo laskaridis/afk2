@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { StringDecoder } from 'node:string_decoder';
 import type { AgentAdapter } from './agents/types.js';
 
@@ -22,7 +23,7 @@ export type SessionResult =
 
 export type AgentOutput = (stream: 'stdout' | 'stderr', chunk: Buffer) => void;
 
-const skillInstructions = 'Use the available code skill for this iteration. Implement one task and follow its response protocol.\n---\n';
+const harnessInstructions = `${readFileSync(new URL('./harness.md', import.meta.url), 'utf8')}\n---\n`;
 
 /** Run one new agent conversation, leaving all run policy to the caller. */
 export async function runSession(config: SessionConfig, signal: AbortSignal, onOutput?: AgentOutput): Promise<SessionResult> {
@@ -80,7 +81,7 @@ export async function runSession(config: SessionConfig, signal: AbortSignal, onO
       }
     });
     child.stdin.on('error', () => {});
-    if (!stopped) child.stdin.end(`${skillInstructions}${config.prompt}`);
+    if (!stopped) child.stdin.end(`${harnessInstructions}${config.prompt}`);
     else child.stdin.end();
     child.on('error', (error) => { launchError = error; });
     child.on('close', (status) => {

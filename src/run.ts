@@ -27,7 +27,7 @@ export type RunEvent =
 export type SessionRunner = (config: SessionConfig, signal: AbortSignal, onOutput?: AgentOutput) => Promise<SessionResult>;
 export type Reporter = (event: RunEvent) => void;
 
-/** Apply the code-skill outcome policy without inspecting project state. */
+/** Apply the harness outcome policy without inspecting project state. */
 export async function runLoop(options: RunOptions, runSession: SessionRunner, report: Reporter, signal: AbortSignal): Promise<RunStatus> {
   const config: SessionConfig = {
     adapter: adapters.get(options.agent ?? defaultAgentName)!,
@@ -55,7 +55,7 @@ export async function runLoop(options: RunOptions, runSession: SessionRunner, re
       const response = parseResponse(result.finalMessage);
       if ('kind' in response) {
         error = result.finalMessage.trim()
-          ? { kind: 'invalid-response', reason: 'code skill protocol violation' }
+          ? { kind: 'invalid-response', reason: 'protocol violation' }
           : { kind: 'missing-response' };
       } else {
         consecutiveErrors = 0;

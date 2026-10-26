@@ -40,7 +40,7 @@ test('launches Codex in the workspace with the prompt and only supplied override
     const { args, cwd, prompt } = JSON.parse(readFileSync(join(dir, 'record.json'), 'utf8'));
     assert.equal(cwd, realpathSync(dir));
     assert.deepEqual(args, ['exec', '--approve-for-me', '-']);
-    assert.match(prompt, /Use the available code skill for this iteration/);
+    assert.match(prompt, /autonomous coding agent/);
     assert.ok(prompt.endsWith('Original task prompt'));
     assert.deepEqual(readdirSync(dir).sort(), ['codex', 'record.json']);
   });

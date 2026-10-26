@@ -1,12 +1,12 @@
 # afk
 
-`afk` runs a prepared coding task through fresh coding agent sessions, one task per session. Choose the agent with `--agent`; Codex is the default. The code skill decides when the work is complete, blocked, or needs another iteration.
+`afk` runs a prepared coding task through fresh coding agent sessions, one task per session. Choose the agent with `--agent`; Codex is the default. The agent decides when the work is complete, blocked, or needs another iteration.
 
 ## Prerequisites
 
 - Node.js 22 or newer and npm.
 - An installed, authenticated CLI for the agent you select, available on `PATH`.
-- The code skill discoverable by the selected agent in the project workspace. Prepare the workspace and its dependencies before starting `afk`.
+- Prepare the workspace and its dependencies before starting `afk`.
 
 Build with `npm install && npm run build`. For local use, invoke `node dist/main.js`. The package exposes the `afk` executable when installed or run through `npx`.
 
@@ -20,7 +20,7 @@ afk --prompt-file prompt.txt
 cat prompt.txt | afk
 ```
 
-The current directory is the workspace unless `--cwd <directory>` selects another existing directory. A stopped run can be restarted with the same prompt in the same workspace; each invocation starts a fresh session budget and the code skill reads project progress from the workspace.
+The current directory is the workspace unless `--cwd <directory>` selects another existing directory. A stopped run can be restarted with the same prompt in the same workspace; each invocation starts a fresh session budget and the agent reads project progress from the workspace.
 
 | Option | Purpose |
 | --- | --- |
@@ -41,8 +41,8 @@ The current directory is the workspace unless `--cwd <directory>` selects anothe
 
 ## Supported agents
 
-- **Codex (`--agent codex`)**: Install and authenticate the `codex` CLI with `--approve-for-me` support. Make the code skill available to Codex in the workspace. `afk` launches `codex exec --approve-for-me` with the prompt on stdin and reads the final message from stdout. It passes `--model` as a model override and `--reasoning-effort` as Codex's `model_reasoning_effort` setting.
-- **Claude Code (`--agent claude`)**: Install and authenticate the `claude` CLI. The `auto` permission mode must be available for your account and selected model. Make the `code` skill discoverable by Claude Code, for example under `.claude/skills` in the workspace. `afk` launches Claude in non-interactive print mode with JSON output and `--permission-mode auto`, sends the prompt on stdin, and reads the JSON `result`. It passes `--model` to Claude's `--model` and `--reasoning-effort` to Claude's `--effort`.
+- **Codex (`--agent codex`)**: Install and authenticate the `codex` CLI with `--approve-for-me` support. `afk` launches `codex exec --approve-for-me` with the prompt on stdin and reads the final message from stdout. It passes `--model` as a model override and `--reasoning-effort` as Codex's `model_reasoning_effort` setting.
+- **Claude Code (`--agent claude`)**: Install and authenticate the `claude` CLI. The `auto` permission mode must be available for your account and selected model. `afk` launches Claude in non-interactive print mode with JSON output and `--permission-mode auto`, sends the prompt on stdin, and reads the JSON `result`. It passes `--model` to Claude's `--model` and `--reasoning-effort` to Claude's `--effort`.
 
 Both agents use `--cwd`, `--max-iterations`, and `--session-timeout` in the shared harness. Model and reasoning effort overrides are passed only when supplied; otherwise each agent uses its own configuration. `afk` does not translate or validate these values for the selected agent.
 

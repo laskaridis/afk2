@@ -54,7 +54,7 @@ test('each execution-error type retries once with the same prompt and workspace'
     [{ kind: 'launch-failed', message: 'ENOENT' }, { kind: 'launch-failed', message: 'ENOENT' }],
     [{ kind: 'exit-failed', status: 7 }, { kind: 'exit-failed', status: 7 }],
     [{ kind: 'ok', finalMessage: '' }, { kind: 'missing-response' }],
-    [{ kind: 'ok', finalMessage: 'not JSON' }, { kind: 'invalid-response', reason: 'code skill protocol violation' }],
+    [{ kind: 'ok', finalMessage: 'not JSON' }, { kind: 'invalid-response', reason: 'protocol violation' }],
   ];
   for (const [first, expectedError] of errors) {
     const calls = [];
@@ -169,7 +169,7 @@ test('execution error events and final status carry only their own stderr tails 
     kind: 'execution-error', error: { kind: 'invalid-response', reason: first.reason }, stderrTail: ['first detail'],
   }]);
   assert.deepEqual(status, {
-    kind: 'execution-error', error: { kind: 'invalid-response', reason: 'code skill protocol violation' }, stderrTail: ['second detail'],
+    kind: 'execution-error', error: { kind: 'invalid-response', reason: 'protocol violation' }, stderrTail: ['second detail'],
   });
 });
 

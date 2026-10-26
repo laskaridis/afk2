@@ -36,7 +36,7 @@ process.stdout.write(JSON.stringify({ result: '{"outcome":"complete"}' }));
     let call = JSON.parse(readFileSync(join(dir, 'record.json'), 'utf8'));
     assert.equal(call.cwd, realpathSync(dir));
     assert.deepEqual(call.args, ['-p', '--output-format', 'json', '--permission-mode', 'auto']);
-    assert.match(call.prompt, /Use the available code skill/);
+    assert.match(call.prompt, /autonomous coding agent/);
     assert.ok(call.prompt.endsWith('Implement task'));
     await session(dir, { model: 'raw-model', reasoningEffort: 'raw-effort' });
     call = JSON.parse(readFileSync(join(dir, 'record.json'), 'utf8'));
@@ -105,7 +105,7 @@ else process.stdout.write(JSON.stringify({ result: outcome === 'violation' ? 'no
       assert.equal(readFileSync(join(dir, 'record.json'), 'utf8'), '2');
       if (error === 'is-error') assert.match(result.stderr, /error_max_turns/);
       if (error === 'is-error-exit') assert.match(result.stderr, /error_during_execution/);
-      if (error === 'violation') assert.match(result.stderr, /code skill protocol violation/);
+      if (error === 'violation') assert.match(result.stderr, /protocol violation/);
     }
     const timeout = launch(['timeout'], ['--session-timeout', '0.8']);
     assert.equal(timeout.status, 2, timeout.stderr);
